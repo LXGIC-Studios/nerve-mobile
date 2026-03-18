@@ -7,9 +7,14 @@ import {
   SafeAreaView,
   Switch,
   Pressable,
-  Platform,
 } from 'react-native';
 import { colors } from '../../src/theme/colors';
+import {
+  LightningIcon,
+  ShieldIcon,
+  WalletIcon,
+  ChevronRightIcon,
+} from '../../src/components/icons';
 
 function SettingRow({
   label,
@@ -152,7 +157,10 @@ export default function SettingsScreen() {
         <SettingSection title="Account">
           <Pressable style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Connected Wallet</Text>
+              <View style={styles.settingLabelRow}>
+                <WalletIcon size={14} color={colors.accent} />
+                <Text style={styles.settingLabel}>Connected Wallet</Text>
+              </View>
               <Text style={styles.walletAddr}>0x7a3F...8b2E</Text>
             </View>
             <View style={styles.connectedDot} />
@@ -162,20 +170,33 @@ export default function SettingsScreen() {
 
           <Pressable style={styles.settingRow}>
             <Text style={styles.settingLabel}>Export Trade History</Text>
-            <Text style={styles.chevron}>›</Text>
+            <ChevronRightIcon size={16} color={colors.textSecondary} />
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <View style={styles.settingLabelRow}>
+                <ShieldIcon size={14} color={colors.textSecondary} />
+                <Text style={styles.settingLabel}>Security</Text>
+              </View>
+            </View>
+            <ChevronRightIcon size={16} color={colors.textSecondary} />
           </Pressable>
 
           <View style={styles.divider} />
 
           <Pressable style={styles.settingRow}>
             <Text style={styles.settingLabel}>Referral Program</Text>
-            <Text style={styles.chevron}>›</Text>
+            <ChevronRightIcon size={16} color={colors.textSecondary} />
           </Pressable>
         </SettingSection>
 
         {/* About */}
         <View style={styles.aboutSection}>
-          <Text style={styles.aboutLogo}>⚡ NERVE</Text>
+          <LightningIcon size={28} color={colors.accent} />
+          <Text style={styles.aboutLogo}>NERVE</Text>
           <Text style={styles.aboutVersion}>v1.0.0 (Testnet)</Text>
           <Text style={styles.aboutTagline}>Trade with your brain, not your gut.</Text>
         </View>
@@ -234,6 +255,11 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 14,
     fontWeight: '500',
+  },
+  settingLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   settingDesc: {
     color: colors.textSecondary,
@@ -312,25 +338,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.profit,
   },
-  chevron: {
-    color: colors.textSecondary,
-    fontSize: 20,
-    fontWeight: '300',
-  },
   aboutSection: {
     alignItems: 'center',
     paddingVertical: 32,
+    gap: 4,
   },
   aboutLogo: {
     color: colors.accent,
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: 2,
+    marginTop: 8,
   },
   aboutVersion: {
     color: colors.textSecondary,
     fontSize: 12,
-    marginTop: 6,
+    marginTop: 2,
   },
   aboutTagline: {
     color: colors.textMuted,

@@ -19,6 +19,13 @@ import { pnlColor, pnlSign } from '../../src/hooks/useFormatters';
 import { StatBox } from '../../src/components/StatBox';
 import { InsightCard } from '../../src/components/InsightCard';
 import { ConvictionBadge } from '../../src/components/ConvictionBadge';
+import {
+  NeuralIcon,
+  TargetIcon,
+  StarIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+} from '../../src/components/icons';
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -50,7 +57,7 @@ function MiniLineChart({ data, color, label }: { data: number[]; color: string; 
       <View style={styles.chartFooter}>
         <Text style={styles.chartFooterText}>30d ago</Text>
         <Text style={[styles.chartFooterValue, { color }]}>
-          {data[data.length - 1].toFixed(1)}%
+          {data[data.length - 1].toFixed(1)}
         </Text>
         <Text style={styles.chartFooterText}>Today</Text>
       </View>
@@ -94,6 +101,18 @@ function Heatmap() {
 }
 
 export default function DashboardScreen() {
+  const trendColor = dashboardStats.disciplineTrend === 'improving'
+    ? colors.profit
+    : dashboardStats.disciplineTrend === 'declining'
+    ? colors.loss
+    : colors.textSecondary;
+
+  const trendLabel = dashboardStats.disciplineTrend === 'improving'
+    ? 'Improving'
+    : dashboardStats.disciplineTrend === 'declining'
+    ? 'Declining'
+    : 'Stable';
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -101,6 +120,33 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Dashboard</Text>
           <Text style={styles.subtitle}>AI Performance Analytics</Text>
+        </View>
+
+        {/* Big Conviction Score */}
+        <View style={styles.convictionHero}>
+          <View style={styles.convictionLeft}>
+            <View style={styles.convictionLabelRow}>
+              <NeuralIcon size={16} color={colors.accent} />
+              <Text style={styles.convictionLabel}>AI CONVICTION</Text>
+            </View>
+            <Text style={styles.convictionDesc}>
+              Overall confidence in your current strategy alignment
+            </Text>
+            {/* Discipline Trend */}
+            <View style={styles.trendRow}>
+              {dashboardStats.disciplineTrend === 'improving' ? (
+                <ArrowUpIcon size={14} color={trendColor} />
+              ) : dashboardStats.disciplineTrend === 'declining' ? (
+                <ArrowDownIcon size={14} color={trendColor} />
+              ) : (
+                <View style={{ width: 14 }} />
+              )}
+              <Text style={[styles.trendText, { color: trendColor }]}>
+                Discipline: {trendLabel}
+              </Text>
+            </View>
+          </View>
+          <ConvictionBadge score={dashboardStats.convictionScore} size="lg" />
         </View>
 
         {/* Key Stats */}
@@ -131,6 +177,34 @@ export default function DashboardScreen() {
               value={dashboardStats.sharpeRatio}
               change={dashboardStats.sharpeChange}
             />
+          </View>
+        </View>
+
+        {/* Edge Map */}
+        <View style={styles.edgeMapCard}>
+          <View style={styles.edgeMapHeader}>
+            <TargetIcon size={14} color={colors.accent} />
+            <Text style={styles.edgeMapTitle}>EDGE MAP</Text>
+          </View>
+          <View style={styles.edgeMapContent}>
+            <View style={styles.edgeMapSection}>
+              <Text style={styles.edgeMapLabel}>Best Hours</Text>
+              {dashboardStats.bestHours.map((h) => (
+                <View key={h} style={styles.edgeMapPill}>
+                  <Text style={styles.edgeMapPillText}>{h}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.edgeMapDivider} />
+            <View style={styles.edgeMapSection}>
+              <Text style={styles.edgeMapLabel}>Strongest Pairs</Text>
+              {dashboardStats.bestPairs.map((p) => (
+                <View key={p} style={styles.edgeMapPill}>
+                  <StarIcon size={10} color={colors.profit} />
+                  <Text style={[styles.edgeMapPillText, { color: colors.profit }]}>{p}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -229,6 +303,106 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
+  // Conviction Hero
+  convictionHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    padding: 16,
+    marginBottom: 16,
+  },
+  convictionLeft: {
+    flex: 1,
+    marginRight: 16,
+  },
+  convictionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  convictionLabel: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  convictionDesc: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trendText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Edge Map
+  edgeMapCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 16,
+  },
+  edgeMapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  edgeMapTitle: {
+    color: colors.textSecondary,
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  edgeMapContent: {
+    flexDirection: 'row',
+  },
+  edgeMapSection: {
+    flex: 1,
+    gap: 6,
+  },
+  edgeMapLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  edgeMapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.bgSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  edgeMapPillText: {
+    color: colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  edgeMapDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 12,
+  },
+  // Stats
   statsGrid: {
     gap: 10,
     marginBottom: 16,

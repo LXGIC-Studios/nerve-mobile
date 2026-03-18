@@ -14,6 +14,12 @@ import { markets } from '../../src/data/mockData';
 import { fmt } from '../../src/hooks/useFormatters';
 import { ChartPlaceholder } from '../../src/components/ChartPlaceholder';
 import { OrderForm } from '../../src/components/OrderForm';
+import {
+  LightningIcon,
+  WalletIcon,
+  ChevronDownIcon,
+  CloseIcon,
+} from '../../src/components/icons';
 
 export default function TradeScreen() {
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -25,11 +31,18 @@ export default function TradeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.logo}>⚡ NERVE</Text>
+          <LightningIcon size={18} color={colors.accent} />
+          <Text style={styles.logo}>NERVE</Text>
         </View>
         <View style={styles.headerRight}>
-          <View style={styles.connectionDot} />
-          <Text style={styles.connectionText}>Testnet</Text>
+          <Pressable style={styles.walletBtn}>
+            <WalletIcon size={14} color={colors.accent} />
+            <Text style={styles.walletText}>Connect</Text>
+          </Pressable>
+          <View style={styles.connectionBadge}>
+            <View style={styles.connectionDot} />
+            <Text style={styles.connectionText}>Testnet</Text>
+          </View>
         </View>
       </View>
 
@@ -60,7 +73,7 @@ export default function TradeScreen() {
               {market.change24h >= 0 ? '+' : ''}{market.change24h.toFixed(2)}%
             </Text>
           </View>
-          <Text style={styles.chevron}>▼</Text>
+          <ChevronDownIcon size={14} color={colors.textSecondary} />
         </Pressable>
 
         {/* Market Stats Bar */}
@@ -91,7 +104,6 @@ export default function TradeScreen() {
         {/* Chart */}
         <ChartPlaceholder height={220} symbol={market.symbol} />
 
-        {/* Spacer */}
         <View style={{ height: 16 }} />
 
         {/* Order Form */}
@@ -110,8 +122,8 @@ export default function TradeScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Market</Text>
-              <Pressable onPress={() => setShowMarketPicker(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+              <Pressable onPress={() => setShowMarketPicker(false)} hitSlop={12}>
+                <CloseIcon size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
             <FlatList
@@ -177,6 +189,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   logo: {
     color: colors.accent,
@@ -185,6 +198,27 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  walletBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accentGlow,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  walletText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  connectionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -268,10 +302,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  chevron: {
-    color: colors.textSecondary,
-    fontSize: 10,
-  },
   statsBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,11 +359,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 17,
     fontWeight: '700',
-  },
-  modalClose: {
-    color: colors.textSecondary,
-    fontSize: 20,
-    padding: 4,
   },
   modalItem: {
     flexDirection: 'row',

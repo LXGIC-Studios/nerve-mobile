@@ -1,21 +1,18 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { colors } from '../../src/theme/colors';
+import {
+  LightningIcon,
+  MarketsIcon,
+  PortfolioIcon,
+  DashboardIcon,
+  MoreIcon,
+} from '../../src/components/icons';
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Trade: '⚡',
-    Markets: '📊',
-    Portfolio: '💼',
-    Dashboard: '🎯',
-    More: '⋯',
-  };
-
+function TabIcon({ icon, focused }: { icon: React.ReactNode; focused: boolean }) {
   return (
     <View style={[styles.iconContainer, focused && styles.iconFocused]}>
-      <Text style={[styles.icon, focused && styles.iconActive]}>
-        {icons[name] || '●'}
-      </Text>
+      {icon}
     </View>
   );
 }
@@ -46,35 +43,60 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Trade',
-          tabBarIcon: ({ focused }) => <TabIcon name="Trade" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              icon={<LightningIcon size={20} color={focused ? colors.accent : colors.tabInactive} />}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="markets"
         options={{
           title: 'Markets',
-          tabBarIcon: ({ focused }) => <TabIcon name="Markets" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              icon={<MarketsIcon size={20} color={focused ? colors.accent : colors.tabInactive} />}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="portfolio"
         options={{
           title: 'Portfolio',
-          tabBarIcon: ({ focused }) => <TabIcon name="Portfolio" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              icon={<PortfolioIcon size={20} color={focused ? colors.accent : colors.tabInactive} />}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon name="Dashboard" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              icon={<DashboardIcon size={20} color={focused ? colors.accent : colors.tabInactive} />}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'More',
-          tabBarIcon: ({ focused }) => <TabIcon name="More" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              icon={<MoreIcon size={20} color={focused ? colors.accent : colors.tabInactive} />}
+            />
+          ),
         }}
       />
     </Tabs>
@@ -91,11 +113,5 @@ const styles = StyleSheet.create({
   },
   iconFocused: {
     backgroundColor: colors.accentGlow,
-  },
-  icon: {
-    fontSize: 18,
-  },
-  iconActive: {
-    // emoji doesn't change color but the glow background helps
   },
 });

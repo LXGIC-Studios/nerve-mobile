@@ -13,7 +13,15 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.bgPrimary },
           animation: 'fade',
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="market/[symbol]"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+      </Stack>
     </View>
   );
 }

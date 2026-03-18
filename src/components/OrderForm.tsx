@@ -1,8 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Platform, Switch } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { ConvictionBadge } from './ConvictionBadge';
+import { ShieldIcon } from './icons';
+
+type OrderType = 'market' | 'limit' | 'stop-limit';
 
 interface OrderFormProps {
   market: string;
@@ -11,19 +14,22 @@ interface OrderFormProps {
 }
 
 export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps) {
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  const [orderType, setOrderType] = useState<OrderType>('market');
   const [size, setSize] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
+  const [triggerPrice, setTriggerPrice] = useState('');
   const [leverage, setLeverage] = useState(5);
+  const [showTpSl, setShowTpSl] = useState(false);
+  const [tpPrice, setTpPrice] = useState('');
+  const [slPrice, setSlPrice] = useState('');
 
-  const convictionScore = 62; // Mock
+  const convictionScore = 62;
 
   const handleOrder = useCallback(async (side: 'long' | 'short') => {
     if (Platform.OS !== 'web') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
-    // Mock order placement
-  }, [size, leverage, orderType, limitPrice]);
+  }, []);
 
   const leverageSteps = [1, 2, 3, 5, 10, 15, 20, maxLeverage].filter(
     (v, i, arr) => arr.indexOf(v) === i && v <= maxLeverage
@@ -33,14 +39,14 @@ export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps)
     <View style={styles.container}>
       {/* Order Type Tabs */}
       <View style={styles.typeTabs}>
-        {(['market', 'limit'] as const).map((type) => (
+        {(['market', 'limit', 'stop-limit'] as const).map((type) => (
           <Pressable
             key={type}
             onPress={() => setOrderType(type)}
             style={[styles.typeTab, orderType === type && styles.typeTabActive]}
           >
             <Text style={[styles.typeTabText, orderType === type && styles.typeTabTextActive]}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
+              {type === 'stop-limit' ? 'Stop-Limit' : type.charAt(0).toUpperCase() + type.slice(1)}
             </Text>
           </Pressable>
         ))}
@@ -55,10 +61,29 @@ export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps)
         <ConvictionBadge score={convictionScore} />
       </View>
 
-      {/* Limit Price */}
-      {orderType === 'limit' && (
+      {/* Stop-Limit: Trigger Price */}
+      {orderType === 'stop-limit' && (
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Price</Text>
+          <Text style={styles.inputLabel}>Trigger Price</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              value={triggerPrice}
+              onChangeText={setTriggerPrice}
+              placeholder={currentPrice.toString()}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="decimal-pad"
+              keyboardAppearance="dark"
+            />
+            <Text style={styles.inputUnit}>USD</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Limit / Stop-Limit: Price */}
+      {(orderType === 'limit' || orderType === 'stop-limit') && (
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{orderType === 'stop-limit' ? 'Limit Price' : 'Price'}</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
@@ -89,7 +114,6 @@ export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps)
           />
           <Text style={styles.inputUnit}>{market.split('-')[0]}</Text>
         </View>
-        {/* Quick size buttons */}
         <View style={styles.quickButtons}>
           {['10%', '25%', '50%', '75%', '100%'].map((pct) => (
             <Pressable key={pct} style={styles.quickBtn}>
@@ -107,7 +131,6 @@ export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps)
             <Text style={styles.leverageBadgeText}>{leverage}x</Text>
           </View>
         </View>
-        {/* Leverage slider using step buttons */}
         <View style={styles.leverageSteps}>
           {leverageSteps.map((step) => (
             <Pressable
@@ -128,23 +151,80 @@ export function OrderForm({ market, currentPrice, maxLeverage }: OrderFormProps)
         </View>
       </View>
 
-      {/* Fee info */}
+      {/* TP/SL Toggle */}
+      <View style={styles.tpslToggle}>
+        <View style={styles.tpslToggleLeft}>
+          <Text style={styles.tpslLabel}>TP / SL</Text>
+          <Text style={styles.tpslDesc}>Take Profit & Stop Loss</Text>
+        </View>
+        <Switch
+          value={showTpSl}
+          onValueChange={setShowTpSl}
+          trackColor={{ false: colors.bgElevated, true: colors.accentDim }}
+          thumbColor={showTpSl ? colors.accent : colors.textSecondary}
+        />
+      </View>
+
+      {showTpSl && (
+        <View style={styles.tpslInputs}>
+          <View style={styles.tpslInputGroup}>
+            <Text style={[styles.tpslInputLabel, { color: colors.profit }]}>Take Profit</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                value={tpPrice}
+                onChangeText={setTpPrice}
+                placeholder="TP Price"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+                keyboardAppearance="dark"
+              />
+              <Text style={styles.inputUnit}>USD</Text>
+            </View>
+          </View>
+          <View style={styles.tpslInputGroup}>
+            <Text style={[styles.tpslInputLabel, { color: colors.loss }]}>Stop Loss</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                value={slPrice}
+                onChangeText={setSlPrice}
+                placeholder="SL Price"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+                keyboardAppearance="dark"
+              />
+              <Text style={styles.inputUnit}>USD</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Fee Tier Badge */}
       <View style={styles.feeRow}>
-        <Text style={styles.feeLabel}>Est. Fee</Text>
-        <Text style={styles.feeValue}>0.05%  ·  Bronze Tier</Text>
+        <View style={styles.feeLeft}>
+          <ShieldIcon size={12} color={colors.textSecondary} />
+          <Text style={styles.feeLabel}>Est. Fee</Text>
+        </View>
+        <View style={styles.feeBadgeRow}>
+          <View style={styles.zeroFeeBadge}>
+            <Text style={styles.zeroFeeText}>ZERO FEES</Text>
+          </View>
+          <Text style={styles.feeValue}>Retail Tier</Text>
+        </View>
       </View>
 
       {/* Long/Short Buttons */}
       <View style={styles.actionButtons}>
         <Pressable
           onPress={() => handleOrder('long')}
-          style={({ pressed }) => [styles.longBtn, pressed && styles.longBtnPressed]}
+          style={({ pressed }) => [styles.longBtn, pressed && styles.btnPressed]}
         >
           <Text style={styles.longBtnText}>Long / Buy</Text>
         </Pressable>
         <Pressable
           onPress={() => handleOrder('short')}
-          style={({ pressed }) => [styles.shortBtn, pressed && styles.shortBtnPressed]}
+          style={({ pressed }) => [styles.shortBtn, pressed && styles.btnPressed]}
         >
           <Text style={styles.shortBtnText}>Short / Sell</Text>
         </Pressable>
@@ -179,7 +259,7 @@ const styles = StyleSheet.create({
   },
   typeTabText: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   typeTabTextActive: {
@@ -305,6 +385,42 @@ const styles = StyleSheet.create({
   leverageStepTextActive: {
     color: colors.accent,
   },
+  // TP/SL
+  tpslToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingTop: 4,
+  },
+  tpslToggleLeft: {
+    flex: 1,
+  },
+  tpslLabel: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tpslDesc: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  tpslInputs: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  tpslInputGroup: {
+    flex: 1,
+  },
+  tpslInputLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  // Fee
   feeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -312,9 +428,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingTop: 4,
   },
+  feeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   feeLabel: {
     color: colors.textSecondary,
     fontSize: 11,
+  },
+  feeBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  zeroFeeBadge: {
+    backgroundColor: 'rgba(0,214,143,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,214,143,0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  zeroFeeText: {
+    color: colors.profit,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   feeValue: {
     color: colors.textTertiary,
@@ -332,14 +472,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  longBtnPressed: {
-    opacity: 0.85,
-  },
-  longBtnText: {
-    color: '#000',
-    fontSize: 15,
-    fontWeight: '700',
-  },
   shortBtn: {
     flex: 1,
     backgroundColor: colors.loss,
@@ -347,8 +479,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  shortBtnPressed: {
+  btnPressed: {
     opacity: 0.85,
+  },
+  longBtnText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
   },
   shortBtnText: {
     color: '#fff',
