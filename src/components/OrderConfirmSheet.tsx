@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Modal, Animated, Dimensions } from 'react-native';
 import { colors } from '../theme/colors';
 import { fmt } from '../hooks/useFormatters';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface OrderConfirmSheetProps {
   visible: boolean;
@@ -36,9 +38,50 @@ export function OrderConfirmSheet({
   const liqDistance = price / leverage;
   const liqPrice = isLong ? price - liqDistance * 0.9 : price + liqDistance * 0.9;
 
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 22,
+          stiffness: 200,
+          mass: 0.8,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 180,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <Pressable style={styles.overlay} onPress={onClose}>
+    <Modal visible={visible} animationType="none" transparent>
+      <Animated.View style={[styles.overlay, { opacity: backdropOpacity }]}>
+        <Pressable style={{ flex: 1 }} onPress={handleClose} />
+      </Animated.View>
+      <Animated.View style={[styles.sheetWrapper, { transform: [{ translateY: slideAnim }] }]}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {/* Handle */}
           <View style={styles.handle} />
@@ -104,7 +147,7 @@ export function OrderConfirmSheet({
 
           {/* Actions */}
           <View style={styles.actions}>
-            <Pressable style={styles.cancelBtn} onPress={onClose}>
+            <Pressable style={styles.cancelBtn} onPress={handleClose}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
@@ -117,16 +160,21 @@ export function OrderConfirmSheet({
             </Pressable>
           </View>
         </Pressable>
-      </Pressable>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
+  },
+  sheetWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   sheet: {
     backgroundColor: colors.bgSecondary,

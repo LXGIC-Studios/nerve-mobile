@@ -28,6 +28,7 @@ import {
   ArrowDownIcon,
   LightningIcon,
 } from '../../src/components/icons';
+import { AnimatedCard } from '../../src/components/AnimatedCard';
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -173,9 +174,12 @@ export default function DashboardScreen() {
         </View>
 
         {/* XP Bar */}
-        <XPBar level={level} xp={xpInLevel} maxXp={500} />
+        <AnimatedCard delay={0}>
+          <XPBar level={level} xp={xpInLevel} maxXp={500} />
+        </AnimatedCard>
 
         {/* Account Overview */}
+        <AnimatedCard delay={80}>
         <View style={styles.accountCard}>
           <View style={styles.accountRow}>
             <View style={styles.accountItem}>
@@ -196,8 +200,10 @@ export default function DashboardScreen() {
             </View>
           </View>
         </View>
+        </AnimatedCard>
 
         {/* AI Conviction */}
+        <AnimatedCard delay={160}>
         <View style={styles.convictionHero}>
           <View style={styles.convictionLeft}>
             <View style={styles.convictionLabelRow}>
@@ -222,6 +228,7 @@ export default function DashboardScreen() {
           </View>
           <ConvictionBadge score={dashboardStats.convictionScore} size="lg" />
         </View>
+        </AnimatedCard>
 
         {/* Key Stats */}
         <View style={styles.statsGrid}>

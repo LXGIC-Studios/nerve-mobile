@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { colors } from '../../src/theme/colors';
 import {
   LightningIcon,
@@ -13,6 +14,7 @@ function TabIcon({ icon, focused }: { icon: React.ReactNode; focused: boolean })
   return (
     <View style={[styles.iconContainer, focused && styles.iconFocused]}>
       {icon}
+      {focused && <View style={styles.activeIndicator} />}
     </View>
   );
 }
@@ -25,17 +27,20 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.bgSecondary,
           borderTopColor: colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.OS === 'ios' ? 88 : 64,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: 4,
+          letterSpacing: 0.2,
         },
       }}
     >
@@ -105,13 +110,22 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 32,
-    height: 28,
+    width: 36,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
+    position: 'relative',
   },
   iconFocused: {
     backgroundColor: colors.accentGlow,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: -4,
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.accent,
   },
 });

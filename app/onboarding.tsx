@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line, Text as SvgText } from 'react-native-svg';
 import { colors } from '../src/theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -48,7 +48,7 @@ function PaperTradeIcon() {
     <Svg width={80} height={80} viewBox="0 0 80 80" fill="none">
       <Rect x="10" y="15" width="60" height="50" rx={2} stroke={colors.accent} strokeWidth={2} strokeLinejoin="miter" />
       <Line x1="10" y1="28" x2="70" y2="28" stroke={colors.border} strokeWidth={1.5} />
-      <Text x="40" y="24" fill={colors.accent} fontSize="10" fontWeight="700" textAnchor="middle">$100,000</Text>
+      <SvgText x="40" y="24" fill={colors.accent} fontSize="10" fontWeight="700" textAnchor="middle">$100,000</SvgText>
       <Path d="M20 55L30 45L38 50L50 35L60 40" stroke={colors.profit} strokeWidth={2} strokeLinecap="square" strokeLinejoin="miter" />
       <Circle cx="60" cy="40" r="3" fill={colors.profit} />
       <Rect x="15" y="32" width="12" height="3" rx={1} fill={colors.accent} opacity={0.3} />

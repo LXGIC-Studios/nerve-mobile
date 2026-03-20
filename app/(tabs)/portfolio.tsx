@@ -16,10 +16,14 @@ import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
 import { useTradingEngine } from '../../src/lib/hooks/useTradingEngine';
 import { usePrices, getLatestPrice } from '../../src/lib/hooks/usePrices';
 import { ShieldIcon, FlameIcon, ChartIcon } from '../../src/components/icons';
+import { AnimatedCard } from '../../src/components/AnimatedCard';
+import { PositionDetailSheet } from '../../src/components/PositionDetailSheet';
+import type { Position } from '../../src/lib/engine/types';
 
 export default function PortfolioScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'positions' | 'history'>('positions');
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const { positions, trades, balance, stats, closePosition } = useTradingEngine();
   const { refresh } = usePrices();
 
@@ -75,6 +79,7 @@ export default function PortfolioScreen() {
         </View>
 
         {/* Equity Card */}
+        <AnimatedCard delay={0}>
         <View style={styles.equityCard}>
           <Text style={styles.equityLabel}>ACCOUNT EQUITY</Text>
           <Text style={styles.equityValue}>${fmt(balance.equity)}</Text>
@@ -100,6 +105,7 @@ export default function PortfolioScreen() {
             </View>
           </View>
         </View>
+        </AnimatedCard>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
@@ -188,7 +194,7 @@ export default function PortfolioScreen() {
                 const isLong = pos.side === 'long';
                 const pnl = pos.unrealizedPnl;
                 return (
-                  <View key={pos.id} style={styles.posCard}>
+                  <Pressable key={pos.id} onPress={() => setSelectedPosition(pos)} style={styles.posCard}>
                     <View style={styles.posHeader}>
                       <View style={styles.posHeaderLeft}>
                         <Text style={styles.posMarket}>{pos.symbol}</Text>
@@ -234,7 +240,7 @@ export default function PortfolioScreen() {
                         </Text>
                       </View>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })
             )}
@@ -322,6 +328,21 @@ export default function PortfolioScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Position Detail Sheet */}
+      <PositionDetailSheet
+        visible={!!selectedPosition}
+        position={selectedPosition}
+        onClose={() => setSelectedPosition(null)}
+        onClosePosition={(posId) => {
+          const pos = positions.find((p) => p.id === posId);
+          if (pos) {
+            const baseSymbol = pos.symbol.replace('-PERP', '');
+            const price = pos.markPrice;
+            closePosition(posId, price);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -481,6 +502,11 @@ const styles = StyleSheet.create({
   tradeCardRight: { alignItems: 'flex-end' },
   tradePnl: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   tradePnlPct: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  tradeCardBody: { gap: 3 },
+  tradeCardBody: { gap: 6 },
   tradeDetail: { color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] },
+  tradeDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  tradeDetailItem: { alignItems: 'center' },
+  tradeDetailLabel: { color: colors.textMuted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
+  tradeDetailValue: { color: colors.textSecondary, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  tradeTimestamp: { color: colors.textMuted, fontSize: 9, textAlign: 'right', marginTop: 4 },
 });

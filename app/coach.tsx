@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  Animated as RNAnimated,
 } from 'react-native';
 import { router } from 'expo-router';
 import { colors } from '../src/theme/colors';
@@ -35,6 +35,43 @@ const QUICK_ACTIONS = [
   { label: 'Position Review', prompt: 'Review my open positions. Should I adjust any stops or take profit?' },
   { label: 'Funding Rates', prompt: 'What do current funding rates suggest about market sentiment?' },
 ];
+
+function TypingIndicator() {
+  const dot1 = React.useRef(new RNAnimated.Value(0.3)).current;
+  const dot2 = React.useRef(new RNAnimated.Value(0.3)).current;
+  const dot3 = React.useRef(new RNAnimated.Value(0.3)).current;
+
+  React.useEffect(() => {
+    const animate = (dot: RNAnimated.Value, delay: number) =>
+      RNAnimated.loop(
+        RNAnimated.sequence([
+          RNAnimated.delay(delay),
+          RNAnimated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          RNAnimated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ])
+      );
+    animate(dot1, 0).start();
+    animate(dot2, 200).start();
+    animate(dot3, 400).start();
+  }, []);
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4, paddingHorizontal: 4 }}>
+      {[dot1, dot2, dot3].map((dot, i) => (
+        <RNAnimated.View
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: colors.accent,
+            opacity: dot,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 export default function CoachScreen() {
   const [messages, setMessages] = useState<Message[]>([
@@ -183,8 +220,8 @@ Live Prices: ${priceContext}
               <View style={styles.assistantAvatar}>
                 <LightningIcon size={12} color={colors.accent} />
               </View>
-              <View style={styles.assistantContent}>
-                <ActivityIndicator size="small" color={colors.accent} />
+              <View style={[styles.assistantContent, styles.typingContent]}>
+                <TypingIndicator />
               </View>
             </View>
           )}
@@ -351,6 +388,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bubbleContent: { maxWidth: '80%', borderRadius: 16, padding: 14 },
+  typingContent: { paddingVertical: 10, paddingHorizontal: 14 },
   userContent: { backgroundColor: colors.accent, borderBottomRightRadius: 4 },
   assistantContent: { backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
   msgText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },

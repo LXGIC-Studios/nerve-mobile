@@ -33,6 +33,8 @@ import {
   CloseIcon,
   NeuralIcon,
 } from '../../src/components/icons';
+import { PositionDetailSheet } from '../../src/components/PositionDetailSheet';
+import type { Position } from '../../src/lib/engine/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -42,6 +44,7 @@ export default function TradeScreen() {
   const [showPositions, setShowPositions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const { prices, error: priceError, refresh } = usePrices();
   const { positions, balance, openPosition, closePosition, ready } = useTradingEngine();
   
@@ -284,7 +287,7 @@ export default function TradeScreen() {
               
               return (
                 <Swipeable key={pos.id} renderRightActions={renderRightAction}>
-                  <View style={styles.posCard}>
+                  <Pressable onPress={() => setSelectedPosition(pos)} style={styles.posCard}>
                   <View style={styles.posCardHeader}>
                     <View style={styles.posCardHeaderLeft}>
                       <Text style={styles.posMarket}>{pos.symbol}</Text>
@@ -336,7 +339,7 @@ export default function TradeScreen() {
                   <Text style={[styles.posPnlPct, { color: pnlColor(pnl) }]}>
                     {pnlSign(pos.unrealizedPnlPct)}{pos.unrealizedPnlPct.toFixed(2)}%
                   </Text>
-                </View>
+                </Pressable>
                 </Swipeable>
               );
             })}
@@ -362,6 +365,14 @@ export default function TradeScreen() {
           orderType={confirmOrder.orderType}
         />
       )}
+
+      {/* Position Detail Sheet */}
+      <PositionDetailSheet
+        visible={!!selectedPosition}
+        position={selectedPosition}
+        onClose={() => setSelectedPosition(null)}
+        onClosePosition={(posId) => handleClosePosition(posId)}
+      />
 
       {/* Market Picker Modal */}
       <Modal visible={showMarketPicker} animationType="slide" transparent>

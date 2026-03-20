@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getBatchPrices, type PriceData } from '../api/prism';
 import { tradingEngine } from '../engine/tradingEngine';
+import { checkPositionAlerts } from '../notifications';
 
 const POLL_INTERVAL = 8000; // 8 seconds
 
@@ -31,6 +32,9 @@ async function fetchAndUpdate(symbols?: string[]) {
       priceMap[sym] = data.price;
     }
     tradingEngine.updateMarkPrices(priceMap);
+    
+    // Check for liquidation warnings
+    checkPositionAlerts(tradingEngine.getPositions(), priceMap);
     
     // Clear any previous error on success
     lastError = null;

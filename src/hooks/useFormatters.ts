@@ -1,3 +1,5 @@
+import { colors } from '../theme/colors';
+
 export function fmt(n: number, d: number = 2): string {
   return n.toLocaleString(undefined, {
     minimumFractionDigits: d,
@@ -13,7 +15,7 @@ export function fmtCompact(n: number): string {
 }
 
 export function pnlColor(n: number): string {
-  return n >= 0 ? '#00D68F' : '#FF6B8A';
+  return n >= 0 ? colors.profit : colors.loss;
 }
 
 export function pnlSign(n: number): string {

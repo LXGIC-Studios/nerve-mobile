@@ -5,6 +5,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Position, ClosedTrade, Balance, Order, TradeStats } from './types';
+import { notifyTpSlHit, clearPositionWarning } from '../notifications';
 
 const STORAGE_KEYS = {
   POSITIONS: 'nerve_positions',
@@ -224,6 +225,7 @@ class TradingEngine {
 
     this.closedTrades.unshift(trade);
     this.positions.splice(idx, 1);
+    clearPositionWarning(positionId);
     this.balance.available += pos.margin + pnl;
     this.balance.marginUsed -= pos.margin;
     this.balance.total += pnl;
@@ -259,14 +261,32 @@ class TradingEngine {
       if (pos.tp) {
         const hitTp = pos.side === 'long' ? newPrice >= pos.tp : newPrice <= pos.tp;
         if (hitTp) {
-          this.closePosition(pos.id, pos.tp);
-          return; // Recalculates and notifies
+          const trade = this.closePosition(pos.id, pos.tp);
+          if (trade) {
+            notifyTpSlHit({
+              symbol: trade.symbol,
+              side: trade.side,
+              type: 'tp',
+              pnl: trade.pnl,
+              exitPrice: trade.exitPrice,
+            });
+          }
+          return;
         }
       }
       if (pos.sl) {
         const hitSl = pos.side === 'long' ? newPrice <= pos.sl : newPrice >= pos.sl;
         if (hitSl) {
-          this.closePosition(pos.id, pos.sl);
+          const trade = this.closePosition(pos.id, pos.sl);
+          if (trade) {
+            notifyTpSlHit({
+              symbol: trade.symbol,
+              side: trade.side,
+              type: 'sl',
+              pnl: trade.pnl,
+              exitPrice: trade.exitPrice,
+            });
+          }
           return;
         }
       }

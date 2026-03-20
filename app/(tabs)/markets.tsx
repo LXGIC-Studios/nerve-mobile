@@ -32,6 +32,8 @@ const categories: Array<{ key: MarketCategory | 'all' | 'favorites'; label: stri
 ];
 
 const FAVORITES_KEY = 'nerve_favorites';
+const RECENT_SEARCHES_KEY = 'nerve_recent_searches';
+const MAX_RECENT_SEARCHES = 8;
 
 export default function MarketsScreen() {
   const [search, setSearch] = useState('');
@@ -40,14 +42,34 @@ export default function MarketsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
   const { prices, loading, refresh } = usePrices();
 
-  // Load favorites
+  // Load favorites and recent searches
   useEffect(() => {
     AsyncStorage.getItem(FAVORITES_KEY).then((data) => {
       if (data) setFavorites(new Set(JSON.parse(data)));
     });
+    AsyncStorage.getItem(RECENT_SEARCHES_KEY).then((data) => {
+      if (data) setRecentSearches(JSON.parse(data));
+    });
     getFearGreed().then(setFearGreed);
+  }, []);
+
+  const addRecentSearch = useCallback(async (term: string) => {
+    if (!term.trim()) return;
+    setRecentSearches((prev) => {
+      const filtered = prev.filter((s) => s.toLowerCase() !== term.toLowerCase());
+      const next = [term, ...filtered].slice(0, MAX_RECENT_SEARCHES);
+      AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const clearRecentSearches = useCallback(async () => {
+    setRecentSearches([]);
+    await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
   }, []);
 
   const toggleFavorite = useCallback(async (symbol: string) => {
@@ -130,17 +152,54 @@ export default function MarketsScreen() {
         <TextInput
           style={styles.searchInput}
           value={search}
-          onChangeText={setSearch}
+          onChangeText={(text) => {
+            setSearch(text);
+            setShowRecent(text.length === 0);
+          }}
+          onFocus={() => setShowRecent(search.length === 0)}
+          onBlur={() => {
+            setTimeout(() => setShowRecent(false), 200);
+          }}
+          onSubmitEditing={() => {
+            if (search.trim()) addRecentSearch(search.trim());
+          }}
           placeholder="Search markets..."
           placeholderTextColor={colors.textMuted}
           keyboardAppearance="dark"
+          returnKeyType="search"
         />
         {search.length > 0 && (
-          <Pressable onPress={() => setSearch('')} hitSlop={8}>
+          <Pressable onPress={() => { setSearch(''); setShowRecent(false); }} hitSlop={8}>
             <CloseIcon size={16} color={colors.textMuted} />
           </Pressable>
         )}
       </View>
+
+      {/* Recent Searches */}
+      {showRecent && recentSearches.length > 0 && (
+        <View style={styles.recentContainer}>
+          <View style={styles.recentHeader}>
+            <Text style={styles.recentTitle}>Recent</Text>
+            <Pressable onPress={clearRecentSearches}>
+              <Text style={styles.recentClear}>Clear</Text>
+            </Pressable>
+          </View>
+          <View style={styles.recentChips}>
+            {recentSearches.map((term, i) => (
+              <Pressable
+                key={`${term}-${i}`}
+                style={styles.recentChip}
+                onPress={() => {
+                  setSearch(term);
+                  setShowRecent(false);
+                }}
+              >
+                <Text style={styles.recentChipText}>{term}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Category Filter */}
       <FlatList
@@ -199,6 +258,7 @@ export default function MarketsScreen() {
               market={{ ...item, price: livePrice, change24h: liveChange }}
               onPress={() => {
                 Keyboard.dismiss();
+                if (search.trim()) addRecentSearch(search.trim());
                 router.push(`/market/${item.symbol}`);
               }}
               isFavorite={favorites.has(item.symbol)}
