@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
 import { markets } from '../../src/data/mockData';
 import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
@@ -26,6 +27,7 @@ import {
   WalletIcon,
   ChevronDownIcon,
   CloseIcon,
+  NeuralIcon,
 } from '../../src/components/icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -124,6 +126,9 @@ export default function TradeScreen() {
             <Text style={styles.balanceLabel}>Equity</Text>
             <Text style={styles.balanceValue}>${fmt(balance.equity)}</Text>
           </View>
+          <Pressable style={styles.coachBtn} onPress={() => router.push('/coach')}>
+            <NeuralIcon size={14} color={colors.accent} />
+          </Pressable>
           <View style={styles.connectionBadge}>
             <View style={styles.connectionDot} />
             <Text style={styles.connectionText}>Paper</Text>
@@ -384,6 +389,16 @@ const styles = StyleSheet.create({
   },
   balanceLabel: { color: colors.textSecondary, fontSize: 9, fontWeight: '600' },
   balanceValue: { color: colors.textPrimary, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  coachBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.accentGlow,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   connectionBadge: {
     flexDirection: 'row',
     alignItems: 'center',

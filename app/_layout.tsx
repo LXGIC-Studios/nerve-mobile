@@ -21,6 +21,12 @@ export default function RootLayout() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="coach"
+          options={{
+            animation: 'slide_from_bottom',
+          }}
+        />
       </Stack>
     </View>
   );
