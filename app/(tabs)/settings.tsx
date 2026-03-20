@@ -25,7 +25,6 @@ import {
   StarIcon,
   ChartIcon,
 } from '../../src/components/icons';
-import { useAuth } from '../../src/contexts/AuthContext';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 const SETTINGS_KEY = 'nerve_settings';
@@ -74,7 +73,7 @@ export default function SettingsScreen() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
   const { balance, stats, resetAccount } = useTradingEngine();
-  const auth = useAuth();
+  
   
 
   // Load persisted settings
@@ -289,27 +288,7 @@ export default function SettingsScreen() {
             </View>
             <ChevronRightIcon size={16} color={colors.loss} />
           </Pressable>
-          <View style={styles.divider} />
-          <Pressable style={styles.settingRow} onPress={() => {
-            if (auth.user) {
-              Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: () => auth.signOut() },
-              ]);
-            } else if (auth.isGuest) {
-              auth.upgradeFromGuest();
-            }
-          }}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>
-                {auth.user ? `Signed in as ${auth.user.email}` : 'Guest Mode'}
-              </Text>
-              <Text style={styles.settingDesc}>
-                {auth.user ? 'Tap to sign out' : 'Sign in to sync your data'}
-              </Text>
-            </View>
-            <ChevronRightIcon size={16} color={colors.textTertiary} />
-          </Pressable>
+
         </SettingSection>
 
         {/* About */}
