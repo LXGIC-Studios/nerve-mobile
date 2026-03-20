@@ -3,13 +3,14 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { tradingEngine } from '../engine/tradingEngine';
-import type { Position, ClosedTrade, Balance, TradeStats } from '../engine/types';
+import type { Position, ClosedTrade, Balance, TradeStats, ExtendedStats } from '../engine/types';
 
 export function useTradingEngine() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [trades, setTrades] = useState<ClosedTrade[]>([]);
   const [balance, setBalance] = useState<Balance>(tradingEngine.getBalance());
   const [stats, setStats] = useState<TradeStats>(tradingEngine.getStats());
+  const [extendedStats, setExtendedStats] = useState<ExtendedStats>(tradingEngine.getExtendedStats());
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -18,6 +19,7 @@ export function useTradingEngine() {
       setTrades(tradingEngine.getClosedTrades());
       setBalance(tradingEngine.getBalance());
       setStats(tradingEngine.getStats());
+      setExtendedStats(tradingEngine.getExtendedStats());
       setReady(true);
     });
 
@@ -26,6 +28,7 @@ export function useTradingEngine() {
       setTrades(tradingEngine.getClosedTrades());
       setBalance(tradingEngine.getBalance());
       setStats(tradingEngine.getStats());
+      setExtendedStats(tradingEngine.getExtendedStats());
     });
 
     return unsub;
@@ -56,6 +59,7 @@ export function useTradingEngine() {
     trades,
     balance,
     stats,
+    extendedStats,
     ready,
     openPosition,
     closePosition,

@@ -63,6 +63,19 @@ export interface ClosedTrade {
   pnlPct: number;
   openedAt: number;
   closedAt: number;
+  hadTp?: boolean;
+  hadSl?: boolean;
+}
+
+export interface ExtendedStats extends TradeStats {
+  avgHoldTimeMs: number;
+  disciplineScore: number;
+  currentEquity: number;
+  currentBalance: number;
+  /** Win rate per day for last 30 days: [{ date: 'YYYY-MM-DD', wins: number, total: number, rate: number }] */
+  winRateByDay: Array<{ date: string; wins: number; total: number; rate: number }>;
+  /** Heatmap: trades per hour-of-day (0-23) x day-of-week (0-6, Sun=0) */
+  heatmap: number[][];
 }
 
 export interface Balance {

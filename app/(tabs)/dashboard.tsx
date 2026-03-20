@@ -1,343 +1,446 @@
-import React, { useState, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
-  RefreshControl,
+  Pressable,
+  Dimensions,
 } from 'react-native';
+import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
-import {
-  dashboardStats,
-  winRateData,
-  disciplineData,
-  aiInsights,
-  heatmapData,
-} from '../../src/data/mockData';
 import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
-import { StatBox } from '../../src/components/StatBox';
-import { InsightCard } from '../../src/components/InsightCard';
-import { ConvictionBadge } from '../../src/components/ConvictionBadge';
 import { useTradingEngine } from '../../src/lib/hooks/useTradingEngine';
 import {
-  NeuralIcon,
-  TargetIcon,
-  StarIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   LightningIcon,
+  ChartIcon,
+  ShieldIcon,
+  FlameIcon,
+  NeuralIcon,
+  StarIcon,
 } from '../../src/components/icons';
 import { AnimatedCard } from '../../src/components/AnimatedCard';
 
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CHART_WIDTH = SCREEN_WIDTH - 64;
+const CHART_HEIGHT = 120;
 
-function MiniLineChart({ data, color, label }: { data: number[]; color: string; label: string }) {
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return '—';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ${hrs % 24}h`;
+}
+
+function MiniChart({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return null;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
+  const w = CHART_WIDTH;
+  const h = CHART_HEIGHT;
+  const step = w / (data.length - 1);
 
+  const points = data.map((v, i) => {
+    const x = i * step;
+    const y = h - ((v - min) / range) * (h - 8) - 4;
+    return `${x},${y}`;
+  }).join(' ');
+
+  // Build SVG-like path using Views (lightweight, no SVG dep)
   return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartLabel}>{label}</Text>
-      <View style={styles.chartArea}>
-        {data.map((v, i) => {
-          const h = ((v - min) / range) * 60 + 4;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.chartBar,
-                {
-                  height: h,
-                  backgroundColor: i === data.length - 1 ? color : `${color}50`,
-                },
-              ]}
-            />
-          );
-        })}
-      </View>
-      <View style={styles.chartFooter}>
-        <Text style={styles.chartFooterText}>30d ago</Text>
-        <Text style={[styles.chartFooterValue, { color }]}>
-          {data[data.length - 1].toFixed(1)}
-        </Text>
-        <Text style={styles.chartFooterText}>Today</Text>
-      </View>
+    <View style={{ width: w, height: h, position: 'relative' }}>
+      {/* Grid lines */}
+      {[0.25, 0.5, 0.75].map((pct) => (
+        <View
+          key={pct}
+          style={{
+            position: 'absolute',
+            top: h * pct,
+            left: 0,
+            right: 0,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: colors.border,
+          }}
+        />
+      ))}
+      {/* Data points as dots connected by the eye */}
+      {data.map((v, i) => {
+        const x = i * step;
+        const y = h - ((v - min) / range) * (h - 8) - 4;
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: x - 2.5,
+              top: y - 2.5,
+              width: 5,
+              height: 5,
+              borderRadius: 2.5,
+              backgroundColor: color,
+            }}
+          />
+        );
+      })}
+      {/* Bar chart fallback */}
+      {data.map((v, i) => {
+        const barH = ((v - min) / range) * (h - 8);
+        const x = i * step;
+        return (
+          <View
+            key={`bar-${i}`}
+            style={{
+              position: 'absolute',
+              left: x - 1,
+              bottom: 0,
+              width: Math.max(2, step - 2),
+              height: Math.max(1, barH),
+              backgroundColor: color,
+              opacity: 0.2,
+              borderTopLeftRadius: 1,
+              borderTopRightRadius: 1,
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
 
-function XPBar({ level, xp, maxXp }: { level: number; xp: number; maxXp: number }) {
-  const pct = (xp / maxXp) * 100;
+function HeatmapGrid({ data }: { data: number[][] }) {
+  const maxVal = Math.max(...data.flat(), 1);
+
   return (
-    <View style={styles.xpCard}>
-      <View style={styles.xpHeader}>
-        <View style={styles.xpHeaderLeft}>
-          <LightningIcon size={16} color={colors.accent} />
-          <Text style={styles.xpLabel}>TRADER LEVEL</Text>
+    <View>
+      {/* Hour labels */}
+      <View style={{ flexDirection: 'row', marginLeft: 30, marginBottom: 4 }}>
+        {[0, 4, 8, 12, 16, 20].map((h) => (
+          <Text
+            key={h}
+            style={{
+              color: colors.textMuted,
+              fontSize: 8,
+              width: (CHART_WIDTH - 30) / 6,
+              textAlign: 'center',
+            }}
+          >
+            {h}:00
+          </Text>
+        ))}
+      </View>
+      {data.map((row, dayIdx) => (
+        <View key={dayIdx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 8, width: 28 }}>
+            {DAY_LABELS[dayIdx]}
+          </Text>
+          {row.map((val, hourIdx) => {
+            const opacity = val / maxVal;
+            return (
+              <View
+                key={hourIdx}
+                style={{
+                  flex: 1,
+                  height: 14,
+                  backgroundColor: colors.accent,
+                  opacity: val > 0 ? 0.15 + opacity * 0.85 : 0.05,
+                  marginHorizontal: 0.5,
+                  borderRadius: 2,
+                }}
+              />
+            );
+          })}
         </View>
-        <Text style={styles.xpLevel}>Lv. {level}</Text>
-      </View>
-      <View style={styles.xpBarTrack}>
-        <View style={[styles.xpBarFill, { width: `${pct}%` }]} />
-      </View>
-      <View style={styles.xpFooter}>
-        <Text style={styles.xpFooterText}>{xp} / {maxXp} XP</Text>
-        <Text style={styles.xpFooterText}>{(maxXp - xp)} XP to next level</Text>
-      </View>
-    </View>
-  );
-}
-
-function Heatmap() {
-  return (
-    <View style={styles.heatmapCard}>
-      <Text style={styles.heatmapTitle}>TRADING FREQUENCY</Text>
-      <View style={styles.heatmapGrid}>
-        {heatmapData.map((row, dayIdx) => (
-          <View key={dayIdx} style={styles.heatmapRow}>
-            <Text style={styles.heatmapDayLabel}>{days[dayIdx]}</Text>
-            {row.map((val, hourIdx) => {
-              const opacity = val / 10;
-              return (
-                <View
-                  key={hourIdx}
-                  style={[
-                    styles.heatmapCell,
-                    { backgroundColor: `rgba(0,229,255,${opacity})`, borderColor: opacity > 0.5 ? colors.borderAccent : 'transparent' },
-                  ]}
-                />
-              );
-            })}
-          </View>
-        ))}
-      </View>
-      <View style={styles.heatmapHours}>
-        {['00', '06', '12', '18', '23'].map((h) => (
-          <Text key={h} style={styles.heatmapHourLabel}>{h}h</Text>
-        ))}
-      </View>
+      ))}
     </View>
   );
 }
 
 export default function DashboardScreen() {
-  const [refreshing, setRefreshing] = useState(false);
-  const { balance, stats, trades } = useTradingEngine();
-  
-  // Calculate XP from trades
-  const xp = stats.totalTrades * 25 + Math.max(0, Math.floor(stats.totalPnl / 100)) * 10;
-  const level = Math.floor(xp / 500) + 1;
-  const xpInLevel = xp % 500;
+  const { trades, positions, extendedStats, balance, ready } = useTradingEngine();
+  const hasTrades = extendedStats.totalTrades > 0;
+  const hasPositions = positions.length > 0;
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    // In a real app, this would refresh dashboard data from APIs
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setRefreshing(false);
-  }, []);
+  const bestTradeSymbol = useMemo(() => {
+    if (trades.length === 0) return null;
+    const best = trades.reduce((a, b) => (a.pnl > b.pnl ? a : b));
+    return best.pnl > 0 ? best : null;
+  }, [trades]);
 
-  const trendColor = dashboardStats.disciplineTrend === 'improving'
-    ? colors.profit
-    : dashboardStats.disciplineTrend === 'declining'
-    ? colors.loss
-    : colors.textSecondary;
+  const worstTradeSymbol = useMemo(() => {
+    if (trades.length === 0) return null;
+    const worst = trades.reduce((a, b) => (a.pnl < b.pnl ? a : b));
+    return worst.pnl < 0 ? worst : null;
+  }, [trades]);
 
-  const trendLabel = dashboardStats.disciplineTrend === 'improving'
-    ? 'Improving'
-    : dashboardStats.disciplineTrend === 'declining'
-    ? 'Declining'
-    : 'Stable';
+  const winRateChartData = useMemo(() => {
+    return extendedStats.winRateByDay.map((d) => d.rate);
+  }, [extendedStats.winRateByDay]);
 
-  // Merge real stats with mock for display
-  const displayWinRate = stats.totalTrades > 0 ? stats.winRate : dashboardStats.winRate;
-  const displayDiscipline = Math.min(100, 60 + (stats.totalTrades * 2));
+  const disciplineColor =
+    extendedStats.disciplineScore >= 75
+      ? colors.profit
+      : extendedStats.disciplineScore >= 40
+        ? colors.caution
+        : colors.loss;
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingContainer}>
+          <LightningIcon size={32} color={colors.accent} />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}
-          />
-        }
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Dashboard</Text>
-          <Text style={styles.subtitle}>AI Performance Analytics</Text>
+          <View>
+            <Text style={styles.title}>Dashboard</Text>
+            <Text style={styles.subtitle}>Your trading performance</Text>
+          </View>
+          <Pressable style={styles.coachBtn} onPress={() => router.push('/coach')}>
+            <NeuralIcon size={16} color={colors.accent} />
+            <Text style={styles.coachBtnText}>Coach</Text>
+          </Pressable>
         </View>
 
-        {/* XP Bar */}
-        <AnimatedCard delay={0}>
-          <XPBar level={level} xp={xpInLevel} maxXp={500} />
-        </AnimatedCard>
-
-        {/* Account Overview */}
-        <AnimatedCard delay={80}>
-        <View style={styles.accountCard}>
-          <View style={styles.accountRow}>
-            <View style={styles.accountItem}>
-              <Text style={styles.accountLabel}>Equity</Text>
-              <Text style={styles.accountValue}>${fmt(balance.equity)}</Text>
-            </View>
-            <View style={styles.accountDivider} />
-            <View style={styles.accountItem}>
-              <Text style={styles.accountLabel}>Total PnL</Text>
-              <Text style={[styles.accountValue, { color: pnlColor(stats.totalPnl) }]}>
-                {pnlSign(stats.totalPnl)}${fmt(Math.abs(stats.totalPnl))}
+        {!hasTrades && !hasPositions ? (
+          /* Empty State */
+          <AnimatedCard delay={0}>
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <ChartIcon size={40} color={colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No Trading Data Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Start placing trades to see your performance stats, win rate charts, discipline score, and trading heatmap here.
               </Text>
+              <Pressable style={styles.startBtn} onPress={() => router.push('/')}>
+                <LightningIcon size={16} color="#000" />
+                <Text style={styles.startBtnText}>Start Trading</Text>
+              </Pressable>
             </View>
-            <View style={styles.accountDivider} />
-            <View style={styles.accountItem}>
-              <Text style={styles.accountLabel}>Trades</Text>
-              <Text style={styles.accountValue}>{stats.totalTrades}</Text>
-            </View>
-          </View>
-        </View>
-        </AnimatedCard>
+          </AnimatedCard>
+        ) : (
+          <>
+            {/* Equity Overview */}
+            <AnimatedCard delay={0}>
+              <View style={styles.equityCard}>
+                <Text style={styles.cardLabel}>ACCOUNT EQUITY</Text>
+                <Text style={styles.equityValue}>${fmt(extendedStats.currentEquity)}</Text>
+                <Text
+                  style={[
+                    styles.pnlBadge,
+                    { color: pnlColor(extendedStats.totalPnl) },
+                  ]}
+                >
+                  {pnlSign(extendedStats.totalPnl)}${fmt(Math.abs(extendedStats.totalPnl))} all time
+                </Text>
+              </View>
+            </AnimatedCard>
 
-        {/* AI Conviction */}
-        <AnimatedCard delay={160}>
-        <View style={styles.convictionHero}>
-          <View style={styles.convictionLeft}>
-            <View style={styles.convictionLabelRow}>
-              <NeuralIcon size={16} color={colors.accent} />
-              <Text style={styles.convictionLabel}>AI CONVICTION</Text>
-            </View>
-            <Text style={styles.convictionDesc}>
-              Overall confidence in your current strategy alignment
-            </Text>
-            <View style={styles.trendRow}>
-              {dashboardStats.disciplineTrend === 'improving' ? (
-                <ArrowUpIcon size={14} color={trendColor} />
-              ) : dashboardStats.disciplineTrend === 'declining' ? (
-                <ArrowDownIcon size={14} color={trendColor} />
-              ) : (
-                <View style={{ width: 14 }} />
-              )}
-              <Text style={[styles.trendText, { color: trendColor }]}>
-                Discipline: {trendLabel}
-              </Text>
-            </View>
-          </View>
-          <ConvictionBadge score={dashboardStats.convictionScore} size="lg" />
-        </View>
-        </AnimatedCard>
-
-        {/* Key Stats */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statsRow}>
-            <StatBox
-              label="Win Rate"
-              value={`${displayWinRate.toFixed(1)}%`}
-              change={stats.totalTrades > 0 ? `${stats.winRate >= 50 ? '+' : ''}${(stats.winRate - 50).toFixed(1)}%` : dashboardStats.winRateChange}
-              changeLabel="vs avg"
-            />
-            <StatBox
-              label="Discipline"
-              value={displayDiscipline.toString()}
-              change={`+${Math.min(stats.totalTrades * 2, 40)}`}
-              changeLabel="pts"
-              accent
-            />
-          </View>
-          <View style={styles.statsRow}>
-            <StatBox
-              label="Avg PnL"
-              value={stats.totalTrades > 0 ? `$${fmt(Math.abs(stats.avgPnl))}` : dashboardStats.avgPnl}
-              change={stats.avgPnl >= 0 ? '+' : '-'}
-            />
-            <StatBox
-              label="Best Trade"
-              value={stats.bestTrade > 0 ? `$${fmt(stats.bestTrade)}` : '$0'}
-              change={stats.bestTrade > 0 ? '+' + fmt(stats.bestTrade) : '—'}
-            />
-          </View>
-        </View>
-
-        {/* Edge Map */}
-        <View style={styles.edgeMapCard}>
-          <View style={styles.edgeMapHeader}>
-            <TargetIcon size={14} color={colors.accent} />
-            <Text style={styles.edgeMapTitle}>EDGE MAP</Text>
-          </View>
-          <View style={styles.edgeMapContent}>
-            <View style={styles.edgeMapSection}>
-              <Text style={styles.edgeMapLabel}>Best Hours</Text>
-              {dashboardStats.bestHours.map((h) => (
-                <View key={h} style={styles.edgeMapPill}>
-                  <Text style={styles.edgeMapPillText}>{h}</Text>
-                </View>
-              ))}
-            </View>
-            <View style={styles.edgeMapDivider} />
-            <View style={styles.edgeMapSection}>
-              <Text style={styles.edgeMapLabel}>Strongest Pairs</Text>
-              {dashboardStats.bestPairs.map((p) => (
-                <View key={p} style={styles.edgeMapPill}>
-                  <StarIcon size={10} color={colors.profit} />
-                  <Text style={[styles.edgeMapPillText, { color: colors.profit }]}>{p}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Charts */}
-        <View style={styles.chartsRow}>
-          <MiniLineChart data={winRateData.map((d) => d.rate)} color={colors.profit} label="WIN RATE (30D)" />
-          <MiniLineChart data={disciplineData.map((d) => d.score)} color={colors.accent} label="DISCIPLINE (30D)" />
-        </View>
-
-        {/* Heatmap */}
-        <Heatmap />
-
-        {/* AI Insights */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>AI Insights</Text>
-          {aiInsights.map((insight, i) => (
-            <InsightCard key={i} insight={insight} />
-          ))}
-        </View>
-
-        {/* Recent Trades (from engine) */}
-        {trades.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Trades</Text>
-            {trades.slice(0, 5).map((trade) => (
-              <View key={trade.id} style={styles.tradeRow}>
-                <View style={styles.tradeLeft}>
-                  <Text style={styles.tradeMarket}>{trade.symbol}</Text>
-                  <View style={styles.tradeMetaRow}>
-                    <Text style={[styles.tradeSide, { color: trade.side === 'long' ? colors.profit : colors.loss }]}>
-                      {trade.side.toUpperCase()}
-                    </Text>
-                    <Text style={styles.tradeTime}>{trade.leverage}x</Text>
-                    <Text style={styles.tradeTime}>
-                      {new Date(trade.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
+            {/* Stats Grid */}
+            <View style={styles.statsGrid}>
+              <AnimatedCard delay={50}>
+                <View style={styles.statCard}>
+                  <View style={styles.statIconRow}>
+                    <ChartIcon size={14} color={colors.accent} />
                   </View>
-                </View>
-                <View style={styles.tradeRight}>
-                  <Text style={[styles.tradePnl, { color: pnlColor(trade.pnl) }]}>
-                    {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
+                  <Text style={styles.statLabel}>Win Rate</Text>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      {
+                        color:
+                          extendedStats.winRate >= 50 ? colors.profit : colors.loss,
+                      },
+                    ]}
+                  >
+                    {extendedStats.winRate.toFixed(1)}%
                   </Text>
-                  <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
-                    {pnlSign(trade.pnlPct)}{Math.abs(trade.pnlPct).toFixed(2)}%
+                </View>
+              </AnimatedCard>
+              <AnimatedCard delay={100}>
+                <View style={styles.statCard}>
+                  <View style={styles.statIconRow}>
+                    <LightningIcon size={14} color={colors.accent} />
+                  </View>
+                  <Text style={styles.statLabel}>Total Trades</Text>
+                  <Text style={styles.statValue}>{extendedStats.totalTrades}</Text>
+                </View>
+              </AnimatedCard>
+              <AnimatedCard delay={150}>
+                <View style={styles.statCard}>
+                  <View style={styles.statIconRow}>
+                    <FlameIcon size={14} color={colors.accent} />
+                  </View>
+                  <Text style={styles.statLabel}>Avg PnL</Text>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      { color: pnlColor(extendedStats.avgPnl) },
+                    ]}
+                  >
+                    {pnlSign(extendedStats.avgPnl)}${fmt(Math.abs(extendedStats.avgPnl))}
+                  </Text>
+                </View>
+              </AnimatedCard>
+              <AnimatedCard delay={200}>
+                <View style={styles.statCard}>
+                  <View style={styles.statIconRow}>
+                    <StarIcon size={14} color={colors.accent} />
+                  </View>
+                  <Text style={styles.statLabel}>Avg Hold</Text>
+                  <Text style={styles.statValue}>
+                    {formatDuration(extendedStats.avgHoldTimeMs)}
+                  </Text>
+                </View>
+              </AnimatedCard>
+            </View>
+
+            {/* Best / Worst Trade */}
+            <View style={styles.bwRow}>
+              <AnimatedCard delay={250}>
+                <View style={[styles.bwCard, { borderColor: 'rgba(0,214,143,0.2)' }]}>
+                  <Text style={styles.bwLabel}>Best Trade</Text>
+                  {bestTradeSymbol ? (
+                    <>
+                      <Text style={[styles.bwValue, { color: colors.profit }]}>
+                        +${fmt(bestTradeSymbol.pnl)}
+                      </Text>
+                      <Text style={styles.bwSymbol}>{bestTradeSymbol.symbol}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.bwEmpty}>—</Text>
+                  )}
+                </View>
+              </AnimatedCard>
+              <AnimatedCard delay={300}>
+                <View style={[styles.bwCard, { borderColor: 'rgba(255,107,138,0.2)' }]}>
+                  <Text style={styles.bwLabel}>Worst Trade</Text>
+                  {worstTradeSymbol ? (
+                    <>
+                      <Text style={[styles.bwValue, { color: colors.loss }]}>
+                        -${fmt(Math.abs(worstTradeSymbol.pnl))}
+                      </Text>
+                      <Text style={styles.bwSymbol}>{worstTradeSymbol.symbol}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.bwEmpty}>—</Text>
+                  )}
+                </View>
+              </AnimatedCard>
+            </View>
+
+            {/* Streaks */}
+            <AnimatedCard delay={350}>
+              <View style={styles.streakRow}>
+                <View style={styles.streakItem}>
+                  <Text style={styles.streakLabel}>Win Streak</Text>
+                  <Text style={[styles.streakValue, { color: colors.profit }]}>
+                    {extendedStats.winStreak}
+                  </Text>
+                </View>
+                <View style={styles.streakDivider} />
+                <View style={styles.streakItem}>
+                  <Text style={styles.streakLabel}>Loss Streak</Text>
+                  <Text style={[styles.streakValue, { color: colors.loss }]}>
+                    {extendedStats.lossStreak}
+                  </Text>
+                </View>
+                <View style={styles.streakDivider} />
+                <View style={styles.streakItem}>
+                  <Text style={styles.streakLabel}>Avg Leverage</Text>
+                  <Text style={[styles.streakValue, { color: colors.accent }]}>
+                    {extendedStats.avgLeverage.toFixed(1)}x
                   </Text>
                 </View>
               </View>
-            ))}
-          </View>
+            </AnimatedCard>
+
+            {/* Discipline Score */}
+            <AnimatedCard delay={400}>
+              <View style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <ShieldIcon size={16} color={disciplineColor} />
+                  <Text style={styles.sectionTitle}>Discipline Score</Text>
+                  <Text style={[styles.disciplineValue, { color: disciplineColor }]}>
+                    {extendedStats.disciplineScore}%
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(extendedStats.disciplineScore, 100)}%`,
+                        backgroundColor: disciplineColor,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.disciplineHint}>
+                  {extendedStats.disciplineScore >= 75
+                    ? 'Excellent risk management. Keep using TP/SL on every trade.'
+                    : extendedStats.disciplineScore >= 40
+                      ? 'Room for improvement. Set TP/SL on more trades to protect your capital.'
+                      : 'Low discipline. Most trades lack TP/SL. Set risk limits before entering positions.'}
+                </Text>
+              </View>
+            </AnimatedCard>
+
+            {/* Win Rate Chart */}
+            {winRateChartData.length >= 2 && (
+              <AnimatedCard delay={450}>
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <ChartIcon size={16} color={colors.accent} />
+                    <Text style={styles.sectionTitle}>Win Rate (30 Days)</Text>
+                  </View>
+                  <MiniChart data={winRateChartData} color={colors.accent} />
+                  <View style={styles.chartLabels}>
+                    <Text style={styles.chartLabelText}>
+                      {extendedStats.winRateByDay[0]?.date ?? ''}
+                    </Text>
+                    <Text style={styles.chartLabelText}>
+                      {extendedStats.winRateByDay[extendedStats.winRateByDay.length - 1]?.date ?? ''}
+                    </Text>
+                  </View>
+                </View>
+              </AnimatedCard>
+            )}
+
+            {/* Heatmap */}
+            {hasTrades && (
+              <AnimatedCard delay={500}>
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                    <FlameIcon size={16} color={colors.accent} />
+                    <Text style={styles.sectionTitle}>Trading Heatmap</Text>
+                  </View>
+                  <Text style={styles.heatmapSubtitle}>
+                    When you trade (hour of day × day of week)
+                  </Text>
+                  <HeatmapGrid data={extendedStats.heatmap} />
+                </View>
+              </AnimatedCard>
+            )}
+          </>
         )}
 
-        <View style={{ height: 32 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -346,142 +449,200 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bgPrimary },
   content: { padding: 16 },
-  header: { marginBottom: 16 },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: { color: colors.textSecondary, fontSize: 14 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800' },
   subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
-  // XP Bar
-  xpCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.borderAccent,
-    padding: 14,
-    marginBottom: 16,
-  },
-  xpHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  xpHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  xpLabel: { color: colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  xpLevel: { color: colors.accent, fontSize: 18, fontWeight: '800' },
-  xpBarTrack: { height: 6, borderRadius: 3, backgroundColor: colors.bgSecondary, overflow: 'hidden' },
-  xpBarFill: { height: '100%', borderRadius: 3, backgroundColor: colors.accent },
-  xpFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  xpFooterText: { color: colors.textSecondary, fontSize: 10, fontVariant: ['tabular-nums'] },
-  // Account Overview
-  accountCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 16,
-  },
-  accountRow: { flexDirection: 'row', alignItems: 'center' },
-  accountItem: { flex: 1, alignItems: 'center' },
-  accountDivider: { width: 1, height: 30, backgroundColor: colors.border },
-  accountLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '600', letterSpacing: 0.3, marginBottom: 4 },
-  accountValue: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  // Conviction
-  convictionHero: {
+  coachBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
+    backgroundColor: colors.accentGlow,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  coachBtnText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
+  // Empty state
+  emptyState: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 10 },
+  emptySubtitle: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  startBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  startBtnText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  // Equity
+  equityCard: {
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderAccent,
-    padding: 16,
+    padding: 20,
+    alignItems: 'center',
     marginBottom: 16,
   },
-  convictionLeft: { flex: 1, marginRight: 16 },
-  convictionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  convictionLabel: { color: colors.accent, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  convictionDesc: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: 10 },
-  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  trendText: { fontSize: 12, fontWeight: '600' },
-  // Stats
-  statsGrid: { gap: 10, marginBottom: 16 },
-  statsRow: { flexDirection: 'row', gap: 10 },
-  // Edge Map
-  edgeMapCard: {
+  cardLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  equityValue: {
+    color: colors.textPrimary,
+    fontSize: 34,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  pnlBadge: { fontSize: 14, fontWeight: '600', marginTop: 6 },
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    width: (SCREEN_WIDTH - 42) / 2,
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
-    marginBottom: 16,
   },
-  edgeMapHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  edgeMapTitle: { color: colors.textSecondary, fontSize: 9, fontWeight: '600', letterSpacing: 0.5 },
-  edgeMapContent: { flexDirection: 'row' },
-  edgeMapSection: { flex: 1, gap: 6 },
-  edgeMapLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '600', marginBottom: 2 },
-  edgeMapPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.bgSecondary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
+  statIconRow: { marginBottom: 8 },
+  statLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 4,
   },
-  edgeMapPillText: { color: colors.textPrimary, fontSize: 11, fontWeight: '600' },
-  edgeMapDivider: { width: 1, backgroundColor: colors.border, marginHorizontal: 12 },
-  // Charts
-  chartsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  chartCard: {
+  statValue: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  // Best/Worst
+  bwRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  bwCard: {
     flex: 1,
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
     padding: 14,
+    alignItems: 'center',
   },
-  chartLabel: { color: colors.textSecondary, fontSize: 9, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
-  chartArea: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 64 },
-  chartBar: { flex: 1, borderRadius: 1.5, minWidth: 2 },
-  chartFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  chartFooterText: { color: colors.textMuted, fontSize: 9 },
-  chartFooterValue: { fontSize: 10, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  // Heatmap
-  heatmapCard: {
+  bwLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  bwValue: { fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  bwSymbol: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
+  bwEmpty: { color: colors.textMuted, fontSize: 18, fontWeight: '700' },
+  // Streaks
+  streakRow: {
+    flexDirection: 'row',
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 16,
   },
-  heatmapTitle: { color: colors.textSecondary, fontSize: 9, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
-  heatmapGrid: { gap: 3 },
-  heatmapRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  heatmapDayLabel: { color: colors.textMuted, fontSize: 8, width: 24 },
-  heatmapCell: { flex: 1, aspectRatio: 1, borderRadius: 2, borderWidth: 0.5 },
-  heatmapHours: { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 26, marginTop: 4 },
-  heatmapHourLabel: { color: colors.textMuted, fontSize: 8 },
+  streakItem: { flex: 1, alignItems: 'center' },
+  streakDivider: { width: 1, backgroundColor: colors.border },
+  streakLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  streakValue: { fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
   // Sections
-  section: { marginBottom: 20 },
-  sectionTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 12 },
-  // Trade rows
-  tradeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  sectionCard: {
     backgroundColor: colors.bgCard,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    marginBottom: 8,
+    padding: 16,
+    marginBottom: 16,
   },
-  tradeLeft: { flex: 1 },
-  tradeMarket: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  tradeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  tradeSide: { fontSize: 11, fontWeight: '700' },
-  tradeTime: { color: colors.textMuted, fontSize: 11 },
-  tradeRight: { alignItems: 'flex-end' },
-  tradePnl: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  tradePnlPct: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 2 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '700', flex: 1 },
+  // Discipline
+  disciplineValue: { fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.bgSecondary,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressFill: { height: '100%', borderRadius: 4 },
+  disciplineHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
+  // Chart
+  chartLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  chartLabelText: { color: colors.textMuted, fontSize: 9 },
+  // Heatmap
+  heatmapSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginBottom: 10,
+  },
 });
