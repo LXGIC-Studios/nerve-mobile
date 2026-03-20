@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Position, ClosedTrade, Balance, Order, TradeStats, ExtendedStats } from './types';
 import { notifyTpSlHit, clearPositionWarning } from '../notifications';
+import { cloudSync } from '../supabase/cloudSync';
 
 const STORAGE_KEYS = {
   POSITIONS: 'nerve_positions',
@@ -60,6 +61,17 @@ class TradingEngine {
       console.warn('Failed to load trading state:', e);
     }
 
+    // Cloud sync: pull state (cloud wins)
+    try {
+      const cloudState = await cloudSync.pullState();
+      if (cloudState) {
+        if (cloudState.positions.length > 0) this.positions = cloudState.positions;
+        if (cloudState.closedTrades.length > 0) this.closedTrades = cloudState.closedTrades;
+        if (cloudState.balance) { this.balance = { ...this.balance, total: cloudState.balance.total, available: cloudState.balance.available }; this.recalculateBalance(); }
+        this.tradeCounter = this.closedTrades.length + this.positions.length;
+        await this.persist();
+      }
+    } catch (e) { console.warn("Cloud sync pull failed, using local:", e); }
     this.initialized = true;
   }
 
@@ -249,6 +261,8 @@ class TradingEngine {
 
     // Cloud sync: push new position
 
+    cloudSync.pushPosition(position).catch(() => {});
+    cloudSync.pushBalance(this.balance).catch(() => {});
     return position;
   }
 
@@ -299,7 +313,8 @@ class TradingEngine {
     this.notify();
 
     // Cloud sync: push closed trade + updated balance
-
+    cloudSync.pushClosedTrade(trade, pos.id).catch(() => {});
+    cloudSync.pushBalance(this.balance).catch(() => {});
     return trade;
   }
 
@@ -406,7 +421,7 @@ class TradingEngine {
     this.notify();
 
     // Cloud sync: push reset
-  }
+    cloudSync.pushReset().catch(() => {});  }
 }
 
 export const tradingEngine = new TradingEngine();
