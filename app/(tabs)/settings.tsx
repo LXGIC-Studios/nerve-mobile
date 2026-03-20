@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,13 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { colors } from '../../src/theme/colors';
 import { useTradingEngine } from '../../src/lib/hooks/useTradingEngine';
 import { fmt } from '../../src/hooks/useFormatters';
+import { setupNotifications } from '../../src/lib/notifications';
 import {
   LightningIcon,
   ShieldIcon,
@@ -22,6 +25,10 @@ import {
   StarIcon,
   ChartIcon,
 } from '../../src/components/icons';
+import { useAuth } from '../../src/contexts/AuthContext';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+const SETTINGS_KEY = 'nerve_settings';
 
 function SettingRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
@@ -65,7 +72,66 @@ export default function SettingsScreen() {
   const [liquidationAlerts, setLiquidationAlerts] = useState(true);
   const [haptics, setHaptics] = useState(true);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<boolean | null>(null);
   const { balance, stats, resetAccount } = useTradingEngine();
+  const auth = useAuth();
+  
+
+  // Load persisted settings
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
+      if (data) {
+        const saved = JSON.parse(data);
+        if (saved.notifications !== undefined) setNotifications(saved.notifications);
+        if (saved.priceAlerts !== undefined) setPriceAlerts(saved.priceAlerts);
+        if (saved.liquidationAlerts !== undefined) setLiquidationAlerts(saved.liquidationAlerts);
+        if (saved.haptics !== undefined) setHaptics(saved.haptics);
+        if (saved.marginMode) setMarginMode(saved.marginMode);
+      }
+    });
+  }, []);
+
+  // Persist settings on change
+  const persistSettings = useCallback((updates: Record<string, any>) => {
+    AsyncStorage.getItem(SETTINGS_KEY).then((data) => {
+      const current = data ? JSON.parse(data) : {};
+      const next = { ...current, ...updates };
+      AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    });
+  }, []);
+
+  const handleNotificationToggle = useCallback(async (value: boolean) => {
+    setNotifications(value);
+    persistSettings({ notifications: value });
+
+    if (value && Platform.OS !== 'web') {
+      const granted = await setupNotifications();
+      setNotifPermission(granted);
+      if (!granted) {
+        Alert.alert(
+          'Notifications Disabled',
+          'Please enable notifications in your device settings to receive trading alerts.'
+        );
+        setNotifications(false);
+        persistSettings({ notifications: false });
+      }
+    }
+  }, [persistSettings]);
+
+  const handlePriceAlertToggle = useCallback((value: boolean) => {
+    setPriceAlerts(value);
+    persistSettings({ priceAlerts: value });
+  }, [persistSettings]);
+
+  const handleLiquidationToggle = useCallback((value: boolean) => {
+    setLiquidationAlerts(value);
+    persistSettings({ liquidationAlerts: value });
+  }, [persistSettings]);
+
+  const handleHapticsToggle = useCallback((value: boolean) => {
+    setHaptics(value);
+    persistSettings({ haptics: value });
+  }, [persistSettings]);
 
   const handleReset = useCallback(() => {
     Alert.alert(
@@ -146,22 +212,22 @@ export default function SettingsScreen() {
         {/* Notifications */}
         <SettingSection title="Notifications">
           <SettingRow label="Push Notifications" description="Order fills, liquidation warnings">
-            <Switch value={notifications} onValueChange={setNotifications} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={notifications ? colors.accent : colors.textSecondary} />
+            <Switch value={notifications} onValueChange={handleNotificationToggle} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={notifications ? colors.accent : colors.textSecondary} />
           </SettingRow>
           <View style={styles.divider} />
           <SettingRow label="Price Alerts">
-            <Switch value={priceAlerts} onValueChange={setPriceAlerts} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={priceAlerts ? colors.accent : colors.textSecondary} />
+            <Switch value={priceAlerts} onValueChange={handlePriceAlertToggle} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={priceAlerts ? colors.accent : colors.textSecondary} />
           </SettingRow>
           <View style={styles.divider} />
           <SettingRow label="Liquidation Warnings">
-            <Switch value={liquidationAlerts} onValueChange={setLiquidationAlerts} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={liquidationAlerts ? colors.accent : colors.textSecondary} />
+            <Switch value={liquidationAlerts} onValueChange={handleLiquidationToggle} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={liquidationAlerts ? colors.accent : colors.textSecondary} />
           </SettingRow>
         </SettingSection>
 
         {/* Preferences */}
         <SettingSection title="Preferences">
           <SettingRow label="Haptic Feedback" description="Vibrate on order placement">
-            <Switch value={haptics} onValueChange={setHaptics} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={haptics ? colors.accent : colors.textSecondary} />
+            <Switch value={haptics} onValueChange={handleHapticsToggle} trackColor={{ false: colors.bgElevated, true: colors.accentDim }} thumbColor={haptics ? colors.accent : colors.textSecondary} />
           </SettingRow>
           <View style={styles.divider} />
           <SettingRow label="Theme">
@@ -223,13 +289,34 @@ export default function SettingsScreen() {
             </View>
             <ChevronRightIcon size={16} color={colors.loss} />
           </Pressable>
+          <View style={styles.divider} />
+          <Pressable style={styles.settingRow} onPress={() => {
+            if (auth.user) {
+              Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Sign Out', style: 'destructive', onPress: () => auth.signOut() },
+              ]);
+            } else if (auth.isGuest) {
+              auth.upgradeFromGuest();
+            }
+          }}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>
+                {auth.user ? `Signed in as ${auth.user.email}` : 'Guest Mode'}
+              </Text>
+              <Text style={styles.settingDesc}>
+                {auth.user ? 'Tap to sign out' : 'Sign in to sync your data'}
+              </Text>
+            </View>
+            <ChevronRightIcon size={16} color={colors.textTertiary} />
+          </Pressable>
         </SettingSection>
 
         {/* About */}
         <View style={styles.aboutSection}>
           <LightningIcon size={28} color={colors.accent} />
           <Text style={styles.aboutLogo}>NERVE</Text>
-          <Text style={styles.aboutVersion}>v1.0.0 (Paper Trading)</Text>
+          <Text style={styles.aboutVersion}>v{APP_VERSION} (Paper Trading)</Text>
           <Text style={styles.aboutTagline}>Trade with your brain, not your gut.</Text>
           <Text style={styles.aboutCredit}>Built by LXGIC Studios</Text>
         </View>

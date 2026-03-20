@@ -4,7 +4,7 @@
  * All trades are simulated locally with realistic fills
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Position, ClosedTrade, Balance, Order, TradeStats } from './types';
+import type { Position, ClosedTrade, Balance, Order, TradeStats, ExtendedStats } from './types';
 import { notifyTpSlHit, clearPositionWarning } from '../notifications';
 
 const STORAGE_KEYS = {
@@ -59,6 +59,7 @@ class TradingEngine {
     } catch (e) {
       console.warn('Failed to load trading state:', e);
     }
+
     this.initialized = true;
   }
 
@@ -129,6 +130,66 @@ class TradingEngine {
     };
   }
 
+  getExtendedStats(): ExtendedStats {
+    const base = this.getStats();
+    const trades = this.closedTrades;
+
+    // Average hold time
+    let avgHoldTimeMs = 0;
+    if (trades.length > 0) {
+      const totalHold = trades.reduce((s, t) => s + (t.closedAt - t.openedAt), 0);
+      avgHoldTimeMs = totalHold / trades.length;
+    }
+
+    // Discipline score: % of trades that had TP or SL set
+    let disciplineScore = 0;
+    if (trades.length > 0) {
+      const withRisk = trades.filter((t) => t.hadTp || t.hadSl).length;
+      disciplineScore = Math.round((withRisk / trades.length) * 100);
+    }
+
+    // Win rate by day (last 30 days)
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+    const recentTrades = trades.filter((t) => t.closedAt >= thirtyDaysAgo);
+    const dayMap = new Map<string, { wins: number; total: number }>();
+
+    for (const t of recentTrades) {
+      const d = new Date(t.closedAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const entry = dayMap.get(key) || { wins: 0, total: 0 };
+      entry.total++;
+      if (t.pnl > 0) entry.wins++;
+      dayMap.set(key, entry);
+    }
+
+    const winRateByDay = Array.from(dayMap.entries())
+      .map(([date, { wins, total }]) => ({
+        date,
+        wins,
+        total,
+        rate: total > 0 ? (wins / total) * 100 : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Heatmap: 7 rows (Sun-Sat) x 24 cols (hours)
+    const heatmap: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+    for (const t of trades) {
+      const d = new Date(t.openedAt);
+      heatmap[d.getDay()][d.getHours()]++;
+    }
+
+    return {
+      ...base,
+      avgHoldTimeMs,
+      disciplineScore,
+      currentEquity: this.balance.equity,
+      currentBalance: this.balance.total,
+      winRateByDay,
+      heatmap,
+    };
+  }
+
   /**
    * Open a new position
    */
@@ -186,6 +247,8 @@ class TradingEngine {
     this.persist();
     this.notify();
 
+    // Cloud sync: push new position
+
     return position;
   }
 
@@ -221,6 +284,8 @@ class TradingEngine {
       pnlPct,
       openedAt: pos.openedAt,
       closedAt: Date.now(),
+      hadTp: pos.tp != null,
+      hadSl: pos.sl != null,
     };
 
     this.closedTrades.unshift(trade);
@@ -232,6 +297,8 @@ class TradingEngine {
     this.recalculateBalance();
     this.persist();
     this.notify();
+
+    // Cloud sync: push closed trade + updated balance
 
     return trade;
   }
@@ -337,6 +404,8 @@ class TradingEngine {
     };
     await this.persist();
     this.notify();
+
+    // Cloud sync: push reset
   }
 }
 
