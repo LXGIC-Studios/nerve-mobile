@@ -29,8 +29,6 @@ export default {
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        NSUserTrackingUsageDescription: "This app uses tracking to provide personalized trading insights and improve your experience.",
-        NSAdvertisingAttributionReportEndpoint: "https://postbacks-app.com"
       },
       privacyManifests: {
         NSPrivacyAccessedAPITypes: [
@@ -62,12 +60,10 @@ export default {
       [
         "expo-notifications",
         {
-          icon: "./assets/notification-icon.png",
-          color: "#ffffff",
-          sounds: ["./assets/notification-sound.wav"]
+          icon: "./assets/icon.png",
+          color: "#00E5FF",
         }
       ],
-      "expo-haptics"
     ],
     experiments: {
       typedRoutes: true

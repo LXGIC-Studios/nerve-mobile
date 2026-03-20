@@ -14,8 +14,13 @@
       "backgroundColor": "#07080A"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.nerve.mobile"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nerve.mobile",
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,8 +35,14 @@
       "output": "static",
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "EXPO_PUBLIC_OPENAI_API_KEY": ""
+    },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      "expo-crypto",
       [
         "expo-notifications",
         {

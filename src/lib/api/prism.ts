@@ -3,8 +3,8 @@
  * Live crypto market data for NERVE mobile
  */
 
-const BASE_URL = 'https://strykr-prism.up.railway.app';
-const API_KEY = 'prism_sk_9CvK3AW6IADrp1REY9BapD7DkqlSo7iSQ_EPQjQzQxI';
+const BASE_URL = process.env.EXPO_PUBLIC_PRISM_API_URL || 'https://strykr-prism.up.railway.app';
+const API_KEY = process.env.EXPO_PUBLIC_PRISM_API_KEY || '';
 
 const headers = {
   'Authorization': `Bearer ${API_KEY}`,
