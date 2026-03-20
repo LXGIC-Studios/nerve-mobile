@@ -344,4 +344,45 @@ const styles = StyleSheet.create({
   resultsText: { color: colors.textMuted, fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
   liveIndicator: { color: colors.accent, fontSize: 10, fontWeight: '600' },
   list: { paddingBottom: 20 },
+  // Recent Searches
+  recentContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  recentTitle: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  recentClear: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  recentChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  recentChip: {
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  recentChipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
 });
