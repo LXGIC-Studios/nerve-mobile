@@ -35,6 +35,7 @@ import {
 } from '../../src/components/icons';
 import { PositionDetailSheet } from '../../src/components/PositionDetailSheet';
 import type { Position } from '../../src/lib/engine/types';
+import { GuestBanner } from '../../src/components/GuestBanner';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -137,6 +138,7 @@ export default function TradeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <GuestBanner />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
