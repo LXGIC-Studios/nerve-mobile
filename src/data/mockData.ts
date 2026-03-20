@@ -28,17 +28,18 @@ export const categoryLabels: Record<MarketCategory, string> = {
 
 export interface Position {
   id: string;
-  market: string;
+  symbol: string; // Changed from 'market' to match trading engine
   side: 'long' | 'short';
   size: number;
+  sizeUsd: number; // Added to match trading engine
   entryPrice: number;
-  currentPrice: number;
+  markPrice: number; // Changed from 'currentPrice' to match trading engine
   leverage: number;
   margin: number;
   unrealizedPnl: number;
   unrealizedPnlPct: number;
   liquidationPrice: number;
-  openedAt: string;
+  openedAt: number; // Changed from string to number to match trading engine
   tp?: number;
   sl?: number;
 }
@@ -119,63 +120,67 @@ export const markets: Market[] = [
 export const positions: Position[] = [
   {
     id: '1',
-    market: 'BTC-PERP',
+    symbol: 'BTC-PERP',
     side: 'long',
     size: 0.5,
+    sizeUsd: 47125,
     entryPrice: 91800,
-    currentPrice: 94250.4,
+    markPrice: 94250.4,
     leverage: 10,
     margin: 4590,
     unrealizedPnl: 1225.2,
     unrealizedPnlPct: 26.69,
     liquidationPrice: 83620,
-    openedAt: '2h ago',
+    openedAt: Date.now() - 2 * 60 * 60 * 1000, // 2h ago
     tp: 98000,
     sl: 89500,
   },
   {
     id: '2',
-    market: 'ETH-PERP',
+    symbol: 'ETH-PERP',
     side: 'short',
     size: 5.0,
+    sizeUsd: 17600,
     entryPrice: 3520,
-    currentPrice: 3412.8,
+    markPrice: 3412.8,
     leverage: 5,
     margin: 3520,
     unrealizedPnl: 536,
     unrealizedPnlPct: 15.23,
     liquidationPrice: 4224,
-    openedAt: '5h ago',
+    openedAt: Date.now() - 5 * 60 * 60 * 1000, // 5h ago
   },
   {
     id: '3',
-    market: 'SOL-PERP',
+    symbol: 'SOL-PERP',
     side: 'long',
     size: 50,
+    sizeUsd: 8932.5,
     entryPrice: 172.30,
-    currentPrice: 178.65,
+    markPrice: 178.65,
     leverage: 3,
     margin: 2871.67,
     unrealizedPnl: 317.5,
     unrealizedPnlPct: 11.06,
     liquidationPrice: 115.53,
-    openedAt: '8h ago',
+    openedAt: Date.now() - 8 * 60 * 60 * 1000, // 8h ago
     tp: 195,
     sl: 165,
   },
   {
     id: '4',
-    market: 'ARB-PERP',
+    symbol: 'ARB-PERP',
     side: 'short',
     size: 2000,
+    sizeUsd: 2480,
     entryPrice: 1.28,
-    currentPrice: 1.24,
+    markPrice: 1.24,
     leverage: 7,
     margin: 365.71,
     unrealizedPnl: 80,
     unrealizedPnlPct: 21.88,
     liquidationPrice: 1.46,
-    openedAt: '1d ago',
+    openedAt: Date.now() - 24 * 60 * 60 * 1000, // 1d ago
   },
 ];
 

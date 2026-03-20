@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
@@ -17,6 +18,7 @@ import { ChevronLeftIcon, LightningIcon } from '../../src/components/icons';
 
 export default function MarketDetailScreen() {
   const { symbol } = useLocalSearchParams<{ symbol: string }>();
+  const [refreshing, setRefreshing] = useState(false);
   const market = markets.find((m) => m.symbol === symbol);
   
   if (!market) {
@@ -28,7 +30,7 @@ export default function MarketDetailScreen() {
   }
 
   const baseSymbol = market.base;
-  const { price: liveData } = usePrice(baseSymbol);
+  const { price: liveData, refresh } = usePrice(baseSymbol);
   
   const currentPrice = liveData?.price ?? market.price;
   const currentChange = liveData?.change24h ?? market.change24h;
@@ -38,6 +40,12 @@ export default function MarketDetailScreen() {
     orderBook.bids[orderBook.bids.length - 1]?.total ?? 0,
     orderBook.asks[orderBook.asks.length - 1]?.total ?? 0
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh?.();
+    setRefreshing(false);
+  }, [refresh]);
 
   return (
     <SafeAreaView style={styles.safe}>

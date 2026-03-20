@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -36,7 +37,8 @@ export default function TradeScreen() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [showMarketPicker, setShowMarketPicker] = useState(false);
   const [showPositions, setShowPositions] = useState(true);
-  const { prices } = usePrices();
+  const [refreshing, setRefreshing] = useState(false);
+  const { prices, refresh } = usePrices();
   const { positions, balance, openPosition, closePosition, ready } = useTradingEngine();
   
   // Order confirmation state
@@ -113,6 +115,12 @@ export default function TradeScreen() {
     closePosition(posId, currentPrice);
   }, [positions, closePosition]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -140,6 +148,13 @@ export default function TradeScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
+        }
       >
         {/* Market Selector */}
         <Pressable onPress={() => setShowMarketPicker(true)} style={styles.marketSelector}>

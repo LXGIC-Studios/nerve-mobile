@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../theme/colors';
 import { fmt, pnlColor, pnlSign } from '../hooks/useFormatters';
-import type { Position } from '../data/mockData';
+import type { Position } from '../lib/engine/types';
 
 interface PositionCardProps {
   position: Position;
@@ -25,7 +25,7 @@ export function PositionCard({ position, onPress }: PositionCardProps) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.market}>{position.market}</Text>
+          <Text style={styles.market}>{position.symbol}</Text>
           <View style={[styles.sideBadge, { backgroundColor: isLong ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)' }]}>
             <Text style={[styles.sideText, { color: isLong ? colors.profit : colors.loss }]}>
               {position.side.toUpperCase()}
@@ -35,14 +35,14 @@ export function PositionCard({ position, onPress }: PositionCardProps) {
             <Text style={styles.leverageText}>{position.leverage}x</Text>
           </View>
         </View>
-        <Text style={styles.openedAt}>{position.openedAt}</Text>
+        <Text style={styles.openedAt}>{new Date(position.openedAt).toLocaleString()}</Text>
       </View>
 
       {/* Body */}
       <View style={styles.body}>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Size</Text>
-          <Text style={styles.statValue}>{position.size} {position.market.split('-')[0]}</Text>
+          <Text style={styles.statValue}>${fmt(position.sizeUsd, 0)}</Text>
         </View>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Entry</Text>
@@ -50,7 +50,7 @@ export function PositionCard({ position, onPress }: PositionCardProps) {
         </View>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Mark</Text>
-          <Text style={styles.statValue}>${fmt(position.currentPrice)}</Text>
+          <Text style={styles.statValue}>${fmt(position.markPrice)}</Text>
         </View>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Liq. Price</Text>
