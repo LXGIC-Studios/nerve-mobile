@@ -59,12 +59,16 @@ export async function getPrice(symbol: string): Promise<PriceData | null> {
     const res = await fetchWithTimeout(`${BASE_URL}/crypto/price/${symbol.toLowerCase()}`);
     if (!res.ok) return null;
     const data = await res.json();
+    const price = data.price ?? data.usd ?? 0;
+    // Don't return zero prices — they break the UI
+    if (!price || price <= 0) return null;
+    
     return {
       symbol: symbol.toUpperCase(),
-      price: data.price ?? data.usd ?? 0,
+      price,
       change24h: data.change24h ?? data.usd_24h_change ?? 0,
-      high24h: data.high24h ?? (data.price ? data.price * 1.02 : 0),
-      low24h: data.low24h ?? (data.price ? data.price * 0.98 : 0),
+      high24h: data.high24h ?? (price ? price * 1.02 : 0),
+      low24h: data.low24h ?? (price ? price * 0.98 : 0),
       volume24h: data.volume24h ?? data.usd_24h_vol ?? 0,
       marketCap: data.marketCap ?? data.usd_market_cap,
     };

@@ -236,7 +236,7 @@ export default function PortfolioScreen() {
                           {pnlSign(pnl)}${fmt(Math.abs(pnl))}
                         </Text>
                         <Text style={[styles.pnlPct, { color: pnlColor(pnl) }]}>
-                          {pnlSign(pos.unrealizedPnlPct)}{pos.unrealizedPnlPct.toFixed(2)}%
+                          {pnlSign(pos.unrealizedPnlPct)}{Math.abs(pos.unrealizedPnlPct).toFixed(2)}%
                         </Text>
                       </View>
                     </View>
@@ -292,7 +292,7 @@ export default function PortfolioScreen() {
                             {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
                           </Text>
                           <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
-                            {pnlSign(trade.pnlPct)}{trade.pnlPct.toFixed(2)}%
+                            {pnlSign(trade.pnlPct)}{Math.abs(trade.pnlPct).toFixed(2)}%
                           </Text>
                         </View>
                       </View>

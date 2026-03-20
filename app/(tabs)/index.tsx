@@ -337,7 +337,7 @@ export default function TradeScreen() {
                     />
                   </View>
                   <Text style={[styles.posPnlPct, { color: pnlColor(pnl) }]}>
-                    {pnlSign(pos.unrealizedPnlPct)}{pos.unrealizedPnlPct.toFixed(2)}%
+                    {pnlSign(pos.unrealizedPnlPct)}{Math.abs(pos.unrealizedPnlPct).toFixed(2)}%
                   </Text>
                 </Pressable>
                 </Swipeable>

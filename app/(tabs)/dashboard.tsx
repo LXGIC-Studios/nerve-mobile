@@ -329,7 +329,7 @@ export default function DashboardScreen() {
                     {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
                   </Text>
                   <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
-                    {pnlSign(trade.pnlPct)}{trade.pnlPct.toFixed(2)}%
+                    {pnlSign(trade.pnlPct)}{Math.abs(trade.pnlPct).toFixed(2)}%
                   </Text>
                 </View>
               </View>

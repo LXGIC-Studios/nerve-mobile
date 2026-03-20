@@ -70,7 +70,7 @@ export function PositionDetailSheet({
 
   const handleShare = useCallback(async () => {
     const direction = position.side.toUpperCase();
-    const pnlText = `${pnlSign(pnl)}$${fmt(Math.abs(pnl))} (${pnlSign(pnlPct)}${pnlPct.toFixed(2)}%)`;
+    const pnlText = `${pnlSign(pnl)}$${fmt(Math.abs(pnl))} (${pnlSign(pnlPct)}${Math.abs(pnlPct).toFixed(2)}%)`;
     const message = [
       `NERVE Paper Trade`,
       `${direction} ${position.symbol} @ ${position.leverage}x`,
@@ -119,7 +119,7 @@ export function PositionDetailSheet({
               {pnlSign(pnl)}${fmt(Math.abs(pnl))}
             </Text>
             <Text style={[styles.pnlPct, { color: pnlColor(pnl) }]}>
-              {pnlSign(pnlPct)}{pnlPct.toFixed(2)}%
+              {pnlSign(pnlPct)}{Math.abs(pnlPct).toFixed(2)}%
             </Text>
           </View>
 

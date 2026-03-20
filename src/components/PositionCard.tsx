@@ -69,7 +69,7 @@ export function PositionCard({ position, onPress }: PositionCardProps) {
             {pnlSign(pnl)}${fmt(Math.abs(pnl))}
           </Text>
           <Text style={[styles.pnlPct, { color: pnlColor(pnl) }]}>
-            {pnlSign(pnlPct)}{pnlPct.toFixed(2)}%
+            {pnlSign(pnlPct)}{Math.abs(pnlPct).toFixed(2)}%
           </Text>
         </View>
       </View>

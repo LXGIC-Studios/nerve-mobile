@@ -19,5 +19,5 @@ export function pnlColor(n: number): string {
 }
 
 export function pnlSign(n: number): string {
-  return n >= 0 ? '+' : '';
+  return n >= 0 ? '+' : '-';
 }

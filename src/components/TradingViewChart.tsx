@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { View, StyleSheet, Platform } from 'react-native';
 import { colors } from '../theme/colors';
 
 interface TradingViewChartProps {
@@ -65,6 +64,28 @@ export function TradingViewChart({ symbol, height = 300 }: TradingViewChartProps
 </body>
 </html>`, [tvSymbol]);
 
+  // On web, use an iframe since react-native-webview doesn't support web
+  if (Platform.OS === 'web') {
+    const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    return (
+      <View style={[styles.container, { height }]}>
+        <iframe
+          src={dataUri}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            borderRadius: 12,
+          } as any}
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </View>
+    );
+  }
+
+  // On native, use WebView
+  const WebView = require('react-native-webview').WebView;
+  
   return (
     <View style={[styles.container, { height }]}>
       <WebView
