@@ -72,7 +72,17 @@ export default function MarketDetailScreen() {
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
+        }
+      >
         {/* Price Header */}
         <View style={styles.priceHeader}>
           <Text style={styles.priceValue}>

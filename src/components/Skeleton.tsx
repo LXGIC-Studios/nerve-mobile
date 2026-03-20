@@ -57,6 +57,51 @@ export function SkeletonCard({ height = 80 }: { height?: number }) {
   );
 }
 
+export function SkeletonPositionCard() {
+  return (
+    <View style={styles.positionCard}>
+      <View style={styles.positionHeader}>
+        <View style={styles.positionLeft}>
+          <Skeleton width={80} height={14} />
+          <Skeleton width={40} height={12} borderRadius={6} style={{ marginLeft: 8 }} />
+          <Skeleton width={25} height={12} style={{ marginLeft: 8 }} />
+        </View>
+        <Skeleton width={50} height={28} borderRadius={8} />
+      </View>
+      <View style={styles.positionStats}>
+        <View style={styles.positionStat}>
+          <Skeleton width={30} height={8} />
+          <Skeleton width={50} height={12} style={{ marginTop: 4 }} />
+        </View>
+        <View style={styles.positionStat}>
+          <Skeleton width={25} height={8} />
+          <Skeleton width={45} height={12} style={{ marginTop: 4 }} />
+        </View>
+        <View style={styles.positionStat}>
+          <Skeleton width={20} height={8} />
+          <Skeleton width={40} height={12} style={{ marginTop: 4 }} />
+        </View>
+        <View style={styles.positionStat}>
+          <Skeleton width={25} height={8} />
+          <Skeleton width={35} height={12} style={{ marginTop: 4 }} />
+        </View>
+      </View>
+      <Skeleton width="100%" height={3} borderRadius={1.5} style={{ marginVertical: 8 }} />
+      <Skeleton width={60} height={10} style={{ alignSelf: 'flex-end' }} />
+    </View>
+  );
+}
+
+export function SkeletonPositions({ count = 3 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <SkeletonPositionCard key={i} />
+      ))}
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
@@ -77,5 +122,31 @@ const styles = StyleSheet.create({
   },
   cardRight: {
     alignItems: 'flex-end',
+  },
+  positionCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 10,
+  },
+  positionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  positionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  positionStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  positionStat: {
+    alignItems: 'center',
   },
 });

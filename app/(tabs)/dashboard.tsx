@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
 import { colors } from '../../src/theme/colors';
 import {
@@ -121,12 +122,20 @@ function Heatmap() {
 }
 
 export default function DashboardScreen() {
+  const [refreshing, setRefreshing] = useState(false);
   const { balance, stats, trades } = useTradingEngine();
   
   // Calculate XP from trades
   const xp = stats.totalTrades * 25 + Math.max(0, Math.floor(stats.totalPnl / 100)) * 10;
   const level = Math.floor(xp / 500) + 1;
   const xpInLevel = xp % 500;
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // In a real app, this would refresh dashboard data from APIs
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setRefreshing(false);
+  }, []);
 
   const trendColor = dashboardStats.disciplineTrend === 'improving'
     ? colors.profit
@@ -146,7 +155,17 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Dashboard</Text>

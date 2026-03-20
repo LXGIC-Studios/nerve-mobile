@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
 import { markets, categoryLabels, type MarketCategory } from '../../src/data/mockData';
 import { MarketCard } from '../../src/components/MarketCard';
-import { SearchIcon, StarIcon } from '../../src/components/icons';
+import { SearchIcon, StarIcon, CloseIcon } from '../../src/components/icons';
 import { usePrices } from '../../src/lib/hooks/usePrices';
 import { getFearGreed, type FearGreedData } from '../../src/lib/api/prism';
 import { Skeleton } from '../../src/components/Skeleton';
@@ -134,6 +134,11 @@ export default function MarketsScreen() {
           placeholderTextColor={colors.textMuted}
           keyboardAppearance="dark"
         />
+        {search.length > 0 && (
+          <Pressable onPress={() => setSearch('')} hitSlop={8}>
+            <CloseIcon size={16} color={colors.textMuted} />
+          </Pressable>
+        )}
       </View>
 
       {/* Category Filter */}

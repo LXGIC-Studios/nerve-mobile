@@ -12,7 +12,9 @@ import {
   Alert,
   Dimensions,
   RefreshControl,
+  Animated,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
@@ -21,6 +23,7 @@ import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
 import { TradingViewChart } from '../../src/components/TradingViewChart';
 import { OrderForm } from '../../src/components/OrderForm';
 import { OrderConfirmSheet } from '../../src/components/OrderConfirmSheet';
+import { SkeletonPositions } from '../../src/components/Skeleton';
 import { usePrices, getLatestPrice } from '../../src/lib/hooks/usePrices';
 import { useTradingEngine } from '../../src/lib/hooks/useTradingEngine';
 import {
@@ -38,7 +41,7 @@ export default function TradeScreen() {
   const [showMarketPicker, setShowMarketPicker] = useState(false);
   const [showPositions, setShowPositions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { prices, refresh } = usePrices();
+  const { prices, error: priceError, refresh } = usePrices();
   const { positions, balance, openPosition, closePosition, ready } = useTradingEngine();
   
   // Order confirmation state
@@ -211,6 +214,17 @@ export default function TradeScreen() {
         {/* TradingView Chart */}
         <TradingViewChart symbol={market.symbol} height={280} />
 
+        {/* Price Error Alert */}
+        {priceError && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>Price Data Error</Text>
+            <Text style={styles.errorText}>{priceError}</Text>
+            <Pressable style={styles.retryBtn} onPress={refresh}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={{ height: 16 }} />
 
         {/* Order Form */}
@@ -223,7 +237,14 @@ export default function TradeScreen() {
         />
 
         {/* Open Positions */}
-        {allPositions.length > 0 && (
+        {!ready ? (
+          <View style={styles.positionsSection}>
+            <View style={styles.positionsHeader}>
+              <Text style={styles.positionsTitle}>Loading Positions...</Text>
+            </View>
+            <SkeletonPositions count={2} />
+          </View>
+        ) : allPositions.length > 0 ? (
           <View style={styles.positionsSection}>
             <Pressable 
               style={styles.positionsHeader}
@@ -240,8 +261,21 @@ export default function TradeScreen() {
             {showPositions && allPositions.map((pos) => {
               const isLong = pos.side === 'long';
               const pnl = pos.unrealizedPnl;
+              
+              const renderRightAction = () => (
+                <Animated.View style={styles.swipeAction}>
+                  <Pressable
+                    style={styles.swipeCloseBtn}
+                    onPress={() => handleClosePosition(pos.id)}
+                  >
+                    <Text style={styles.swipeCloseText}>Close</Text>
+                  </Pressable>
+                </Animated.View>
+              );
+              
               return (
-                <View key={pos.id} style={styles.posCard}>
+                <Swipeable key={pos.id} renderRightActions={renderRightAction}>
+                  <View style={styles.posCard}>
                   <View style={styles.posCardHeader}>
                     <View style={styles.posCardHeaderLeft}>
                       <Text style={styles.posMarket}>{pos.symbol}</Text>
@@ -294,10 +328,11 @@ export default function TradeScreen() {
                     {pnlSign(pos.unrealizedPnlPct)}{pos.unrealizedPnlPct.toFixed(2)}%
                   </Text>
                 </View>
+                </Swipeable>
               );
             })}
           </View>
-        )}
+        ) : null}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -564,4 +599,42 @@ const styles = StyleSheet.create({
   modalItemRight: { alignItems: 'flex-end' },
   modalItemPrice: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
   modalItemChange: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  // Error handling
+  errorCard: {
+    backgroundColor: 'rgba(255,107,138,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,138,0.3)',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  errorTitle: { color: colors.loss, fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  errorText: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 8 },
+  retryBtn: {
+    backgroundColor: colors.loss,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  retryText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  // Swipe actions
+  swipeAction: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 20,
+  },
+  swipeCloseBtn: {
+    backgroundColor: colors.loss,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '80%',
+    borderRadius: 12,
+  },
+  swipeCloseText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

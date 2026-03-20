@@ -15,6 +15,7 @@ let globalPrices: Record<string, PriceData> = {};
 let globalListeners: Set<() => void> = new Set();
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let isPolling = false;
+let lastError: string | null = null;
 
 async function fetchAndUpdate(symbols?: string[]) {
   if (isPolling) return;
@@ -31,10 +32,16 @@ async function fetchAndUpdate(symbols?: string[]) {
     }
     tradingEngine.updateMarkPrices(priceMap);
     
+    // Clear any previous error on success
+    lastError = null;
+    
     // Notify all listeners
     globalListeners.forEach((l) => l());
   } catch (e) {
+    lastError = e instanceof Error ? e.message : 'Failed to fetch prices';
     console.warn('Price poll failed:', e);
+    // Still notify listeners so they can display error state
+    globalListeners.forEach((l) => l());
   } finally {
     isPolling = false;
   }
@@ -56,11 +63,13 @@ function stopPolling() {
 export function usePrices(additionalSymbols?: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceData>>(globalPrices);
   const [loading, setLoading] = useState(Object.keys(globalPrices).length === 0);
+  const [error, setError] = useState<string | null>(lastError);
 
   useEffect(() => {
     const listener = () => {
       setPrices({ ...globalPrices });
       setLoading(false);
+      setError(lastError);
     };
     globalListeners.add(listener);
     startPolling();
@@ -77,17 +86,19 @@ export function usePrices(additionalSymbols?: string[]) {
   }, []);
 
   const refresh = useCallback(() => {
+    setError(null); // Clear error on manual refresh
     fetchAndUpdate(additionalSymbols ? [...CORE_SYMBOLS, ...additionalSymbols] : undefined);
   }, [additionalSymbols]);
 
-  return { prices, loading, refresh };
+  return { prices, loading, error, refresh };
 }
 
 export function usePrice(symbol: string) {
-  const { prices, loading, refresh } = usePrices([symbol]);
+  const { prices, loading, error, refresh } = usePrices([symbol]);
   return {
     price: prices[symbol.toUpperCase()] ?? null,
     loading,
+    error,
     refresh,
   };
 }
