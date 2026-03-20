@@ -255,40 +255,67 @@ export default function PortfolioScreen() {
                 </Text>
               </View>
             ) : (
-              trades.slice(0, 50).map((trade) => {
-                const isLong = trade.side === 'long';
-                return (
-                  <View key={trade.id} style={styles.tradeCard}>
-                    <View style={styles.tradeCardHeader}>
-                      <View style={styles.tradeCardLeft}>
-                        <Text style={styles.tradeSymbol}>{trade.symbol}</Text>
-                        <View style={[styles.sideBadge, { backgroundColor: isLong ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)' }]}>
-                          <Text style={[styles.sideText, { color: isLong ? colors.profit : colors.loss }]}>
-                            {trade.side.toUpperCase()}
+              [...trades]
+                .sort((a, b) => b.closedAt - a.closedAt)
+                .slice(0, 50)
+                .map((trade) => {
+                  const isLong = trade.side === 'long';
+                  const durationMs = trade.closedAt - trade.openedAt;
+                  const durationMin = Math.floor(durationMs / 60000);
+                  const durationStr = durationMin < 60
+                    ? `${durationMin}m`
+                    : durationMin < 1440
+                      ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+                      : `${Math.floor(durationMin / 1440)}d ${Math.floor((durationMin % 1440) / 60)}h`;
+                  const pnlBgColor = trade.pnl >= 0 ? 'rgba(0,214,143,0.06)' : 'rgba(255,107,138,0.06)';
+                  const pnlBorderColor = trade.pnl >= 0 ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)';
+                  return (
+                    <View key={trade.id} style={[styles.tradeCard, { backgroundColor: pnlBgColor, borderColor: pnlBorderColor }]}>
+                      <View style={styles.tradeCardHeader}>
+                        <View style={styles.tradeCardLeft}>
+                          <Text style={styles.tradeSymbol}>{trade.symbol}</Text>
+                          <View style={[styles.sideBadge, { backgroundColor: isLong ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)' }]}>
+                            <Text style={[styles.sideText, { color: isLong ? colors.profit : colors.loss }]}>
+                              {trade.side.toUpperCase()}
+                            </Text>
+                          </View>
+                          <Text style={styles.leverageTag}>{trade.leverage}x</Text>
+                        </View>
+                        <View style={styles.tradeCardRight}>
+                          <Text style={[styles.tradePnl, { color: pnlColor(trade.pnl) }]}>
+                            {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
+                          </Text>
+                          <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
+                            {pnlSign(trade.pnlPct)}{trade.pnlPct.toFixed(2)}%
                           </Text>
                         </View>
-                        <Text style={styles.leverageTag}>{trade.leverage}x</Text>
                       </View>
-                      <View style={styles.tradeCardRight}>
-                        <Text style={[styles.tradePnl, { color: pnlColor(trade.pnl) }]}>
-                          {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
-                        </Text>
-                        <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
-                          {pnlSign(trade.pnlPct)}{trade.pnlPct.toFixed(2)}%
+                      <View style={styles.tradeCardBody}>
+                        <View style={styles.tradeDetailRow}>
+                          <View style={styles.tradeDetailItem}>
+                            <Text style={styles.tradeDetailLabel}>Entry</Text>
+                            <Text style={styles.tradeDetailValue}>${fmt(trade.entryPrice, 2)}</Text>
+                          </View>
+                          <View style={styles.tradeDetailItem}>
+                            <Text style={styles.tradeDetailLabel}>Exit</Text>
+                            <Text style={styles.tradeDetailValue}>${fmt(trade.exitPrice, 2)}</Text>
+                          </View>
+                          <View style={styles.tradeDetailItem}>
+                            <Text style={styles.tradeDetailLabel}>Duration</Text>
+                            <Text style={styles.tradeDetailValue}>{durationStr}</Text>
+                          </View>
+                          <View style={styles.tradeDetailItem}>
+                            <Text style={styles.tradeDetailLabel}>Size</Text>
+                            <Text style={styles.tradeDetailValue}>${fmt(trade.sizeUsd, 0)}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.tradeTimestamp}>
+                          {new Date(trade.closedAt).toLocaleString()}
                         </Text>
                       </View>
                     </View>
-                    <View style={styles.tradeCardBody}>
-                      <Text style={styles.tradeDetail}>
-                        Entry: ${fmt(trade.entryPrice, 2)} → Exit: ${fmt(trade.exitPrice, 2)}
-                      </Text>
-                      <Text style={styles.tradeDetail}>
-                        Size: ${fmt(trade.sizeUsd, 0)} · {new Date(trade.closedAt).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
+                  );
+                })
             )}
           </View>
         )}

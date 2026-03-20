@@ -18,6 +18,9 @@ import { useTradingEngine } from '../src/lib/hooks/useTradingEngine';
 import { usePrices } from '../src/lib/hooks/usePrices';
 import { fmt, pnlSign } from '../src/hooks/useFormatters';
 
+// Coach API configuration — configurable base URL
+const COACH_API_BASE_URL = 'https://nerve-production-f309.up.railway.app';
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -78,26 +81,50 @@ Live Prices: ${priceContext}
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
-
-    // Simulate AI response (in production, this would hit the coach API)
-    setTimeout(() => {
-      const context = buildContext();
-      const response = generateCoachResponse(text.trim(), context, positions, stats);
-      
-      const assistantMsg: Message = {
-        id: `asst-${Date.now()}`,
-        role: 'assistant',
-        content: response,
-        timestamp: Date.now(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      setIsLoading(false);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 800 + Math.random() * 1200);
-
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [buildContext, positions, stats]);
+
+    const context = buildContext();
+    let response: string;
+
+    try {
+      // Try the real coach API first
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`${COACH_API_BASE_URL}/api/coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text.trim(),
+          context,
+          history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        response = data.response ?? data.message ?? data.content ?? '';
+      } else {
+        // API returned error, fall back to local
+        response = generateCoachResponse(text.trim(), context, positions, stats);
+      }
+    } catch (e) {
+      // Network error or timeout, fall back to local generation
+      response = generateCoachResponse(text.trim(), context, positions, stats);
+    }
+
+    const assistantMsg: Message = {
+      id: `asst-${Date.now()}`,
+      role: 'assistant',
+      content: response,
+      timestamp: Date.now(),
+    };
+
+    setMessages((prev) => [...prev, assistantMsg]);
+    setIsLoading(false);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, [buildContext, positions, stats, messages]);
 
   return (
     <SafeAreaView style={styles.safe}>

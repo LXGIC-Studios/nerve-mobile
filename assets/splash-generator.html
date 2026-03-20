@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; }
+  body { width: 1024px; height: 1024px; overflow: hidden; background: #07080A; }
+  .container {
+    width: 1024px;
+    height: 1024px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    gap: 40px;
+  }
+  /* Ambient glow */
+  .glow {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,255,0.10) 0%, rgba(0,229,255,0.02) 50%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -55%);
+  }
+  .n-mark { position: relative; z-index: 2; }
+  .wordmark {
+    position: relative;
+    z-index: 2;
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: 20px;
+    color: #00E5FF;
+    text-shadow: 0 0 40px rgba(0,229,255,0.3);
+  }
+  svg {
+    filter: drop-shadow(0 0 30px rgba(0,229,255,0.2));
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="glow"></div>
+  <div class="n-mark">
+    <svg width="280" height="312" viewBox="0 0 520 580" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M40 560 L40 20 L120 20 L120 560 Z" fill="#00E5FF"/>
+      <path d="M120 20 L400 560 L480 560 L480 480 L200 20 Z" fill="#00E5FF"/>
+      <path d="M400 20 L480 20 L480 560 L400 560 Z" fill="#00E5FF"/>
+    </svg>
+  </div>
+  <div class="wordmark">NERVE</div>
+</div>
+</body>
+</html>
