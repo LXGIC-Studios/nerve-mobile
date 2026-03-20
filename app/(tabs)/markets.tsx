@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,45 +9,77 @@ import {
   SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
 import { markets, categoryLabels, type MarketCategory } from '../../src/data/mockData';
 import { MarketCard } from '../../src/components/MarketCard';
-import { SearchIcon } from '../../src/components/icons';
+import { SearchIcon, StarIcon } from '../../src/components/icons';
+import { usePrices } from '../../src/lib/hooks/usePrices';
+import { getFearGreed, type FearGreedData } from '../../src/lib/api/prism';
+import { Skeleton } from '../../src/components/Skeleton';
 
 type SortKey = 'symbol' | 'price' | 'change' | 'volume';
 
-const categories: Array<{ key: MarketCategory | 'all'; label: string }> = [
+const categories: Array<{ key: MarketCategory | 'all' | 'favorites'; label: string }> = [
   { key: 'all', label: 'All' },
+  { key: 'favorites', label: '★ Favorites' },
   ...Object.entries(categoryLabels).map(([key, label]) => ({
     key: key as MarketCategory,
     label,
   })),
 ];
 
+const FAVORITES_KEY = 'nerve_favorites';
+
 export default function MarketsScreen() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('volume');
-  const [category, setCategory] = useState<MarketCategory | 'all'>('all');
+  const [category, setCategory] = useState<MarketCategory | 'all' | 'favorites'>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null);
+  const { prices, loading, refresh } = usePrices();
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+  // Load favorites
+  useEffect(() => {
+    AsyncStorage.getItem(FAVORITES_KEY).then((data) => {
+      if (data) setFavorites(new Set(JSON.parse(data)));
+    });
+    getFearGreed().then(setFearGreed);
   }, []);
+
+  const toggleFavorite = useCallback(async (symbol: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh();
+    const fg = await getFearGreed();
+    if (fg) setFearGreed(fg);
+    setRefreshing(false);
+  }, [refresh]);
 
   const filtered = useMemo(() =>
     markets
       .filter((m) => {
-        if (category !== 'all' && m.category !== category) return false;
-        if (search && !m.symbol.toLowerCase().includes(search.toLowerCase())) return false;
+        if (category === 'favorites' && !favorites.has(m.symbol)) return false;
+        if (category !== 'all' && category !== 'favorites' && m.category !== category) return false;
+        if (search && !m.symbol.toLowerCase().includes(search.toLowerCase()) && !m.base.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
       .sort((a, b) => {
         switch (sortBy) {
           case 'symbol': return a.symbol.localeCompare(b.symbol);
-          case 'price': return b.price - a.price;
-          case 'change': return Math.abs(b.change24h) - Math.abs(a.change24h);
+          case 'price': return (prices[b.base]?.price ?? b.price) - (prices[a.base]?.price ?? a.price);
+          case 'change': return Math.abs(prices[b.base]?.change24h ?? b.change24h) - Math.abs(prices[a.base]?.change24h ?? a.change24h);
           case 'volume': {
             const parseVol = (v: string) => {
               const num = parseFloat(v);
@@ -60,15 +92,35 @@ export default function MarketsScreen() {
           default: return 0;
         }
       }),
-    [search, sortBy, category]
+    [search, sortBy, category, prices, favorites]
   );
+
+  const fearGreedColor = fearGreed
+    ? fearGreed.value >= 75 ? colors.profit
+    : fearGreed.value >= 50 ? colors.accent
+    : fearGreed.value >= 25 ? colors.caution
+    : colors.loss
+    : colors.textSecondary;
 
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Markets</Text>
-        <Text style={styles.subtitle}>{markets.length} Perpetuals</Text>
+        <View>
+          <Text style={styles.title}>Markets</Text>
+          <Text style={styles.subtitle}>{markets.length} Perpetuals</Text>
+        </View>
+        {fearGreed && (
+          <View style={styles.fearGreedBadge}>
+            <Text style={styles.fearGreedLabel}>Fear & Greed</Text>
+            <Text style={[styles.fearGreedValue, { color: fearGreedColor }]}>
+              {fearGreed.value}
+            </Text>
+            <Text style={[styles.fearGreedClass, { color: fearGreedColor }]}>
+              {fearGreed.classification}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Search */}
@@ -126,18 +178,25 @@ export default function MarketsScreen() {
       {/* Results count */}
       <View style={styles.resultsBar}>
         <Text style={styles.resultsText}>{filtered.length} results</Text>
+        {loading && <Text style={styles.liveIndicator}>Fetching live data...</Text>}
       </View>
 
       {/* Market List */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.symbol}
-        renderItem={({ item }) => (
-          <MarketCard
-            market={item}
-            onPress={() => router.push(`/market/${item.symbol}`)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const livePrice = prices[item.base]?.price ?? item.price;
+          const liveChange = prices[item.base]?.change24h ?? item.change24h;
+          return (
+            <MarketCard
+              market={{ ...item, price: livePrice, change24h: liveChange }}
+              onPress={() => router.push(`/market/${item.symbol}`)}
+              isFavorite={favorites.has(item.symbol)}
+              onToggleFavorite={() => toggleFavorite(item.symbol)}
+            />
+          );
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -153,25 +212,28 @@ export default function MarketsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
+  safe: { flex: 1, backgroundColor: colors.bgPrimary },
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '800',
+  title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800' },
+  subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
+  fearGreedBadge: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 10,
+    alignItems: 'center',
   },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 4,
-  },
+  fearGreedLabel: { color: colors.textSecondary, fontSize: 8, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  fearGreedValue: { fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'], marginVertical: 2 },
+  fearGreedClass: { fontSize: 9, fontWeight: '600' },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,17 +246,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 14,
-    paddingVertical: 12,
-  },
-  categoryRow: {
-    paddingHorizontal: 16,
-    gap: 6,
-    marginBottom: 8,
-  },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: 14, paddingVertical: 12 },
+  categoryRow: { paddingHorizontal: 16, gap: 6, marginBottom: 8 },
   categoryPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -203,24 +256,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  categoryPillActive: {
-    backgroundColor: colors.accentGlow,
-    borderColor: colors.accent,
-  },
-  categoryPillText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  categoryPillTextActive: {
-    color: colors.accent,
-  },
-  sortRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 4,
-  },
+  categoryPillActive: { backgroundColor: colors.accentGlow, borderColor: colors.accent },
+  categoryPillText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  categoryPillTextActive: { color: colors.accent },
+  sortRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 },
   sortPill: {
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -229,28 +268,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  sortPillActive: {
-    borderColor: colors.border,
-  },
-  sortPillText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sortPillTextActive: {
-    color: colors.textSecondary,
-  },
-  resultsBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  resultsText: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  list: {
-    paddingBottom: 20,
-  },
+  sortPillActive: { borderColor: colors.border },
+  sortPillText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  sortPillTextActive: { color: colors.textSecondary },
+  resultsBar: { paddingHorizontal: 16, paddingVertical: 6, flexDirection: 'row', justifyContent: 'space-between' },
+  resultsText: { color: colors.textMuted, fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
+  liveIndicator: { color: colors.accent, fontSize: 10, fontWeight: '600' },
+  list: { paddingBottom: 20 },
 });

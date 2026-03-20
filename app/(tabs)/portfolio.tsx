@@ -7,108 +7,124 @@ import {
   SafeAreaView,
   RefreshControl,
   Pressable,
+  Alert,
+  Platform,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../../src/theme/colors';
-import { positions, portfolioStats, feeTiers, pnlData } from '../../src/data/mockData';
 import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
-import { PositionCard } from '../../src/components/PositionCard';
+import { useTradingEngine } from '../../src/lib/hooks/useTradingEngine';
+import { usePrices, getLatestPrice } from '../../src/lib/hooks/usePrices';
 import { ShieldIcon, FlameIcon, ChartIcon } from '../../src/components/icons';
 
 export default function PortfolioScreen() {
   const [refreshing, setRefreshing] = useState(false);
-  const [showFees, setShowFees] = useState(false);
+  const [activeTab, setActiveTab] = useState<'positions' | 'history'>('positions');
+  const { positions, trades, balance, stats, closePosition } = useTradingEngine();
+  const { refresh } = usePrices();
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
 
-  const stats = portfolioStats;
+  const handleClosePosition = useCallback(async (posId: string) => {
+    const pos = positions.find((p) => p.id === posId);
+    if (!pos) return;
+    
+    Alert.alert(
+      'Close Position',
+      `Close ${pos.side.toUpperCase()} ${pos.symbol} at market?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close',
+          style: 'destructive',
+          onPress: async () => {
+            if (Platform.OS !== 'web') {
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            }
+            const baseSymbol = pos.symbol.replace('-PERP', '');
+            const price = getLatestPrice(baseSymbol) ?? pos.markPrice;
+            closePosition(posId, price);
+          },
+        },
+      ]
+    );
+  }, [positions, closePosition]);
+
   const totalPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
-
-  const marginRatioColor =
-    stats.marginRatio > 80 ? colors.loss :
-    stats.marginRatio > 50 ? colors.caution :
-    stats.marginRatio > 25 ? colors.accent : colors.profit;
-
-  // PnL chart
-  const maxPnl = Math.max(...pnlData.map((d) => Math.abs(d.pnl)));
+  const marginRatio = balance.equity > 0 ? (balance.marginUsed / balance.equity) * 100 : 0;
+  const marginRatioColor = marginRatio > 80 ? colors.loss : marginRatio > 50 ? colors.caution : marginRatio > 25 ? colors.accent : colors.profit;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+        contentContainerStyle={styles.content}
       >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Portfolio</Text>
-          {/* Margin Mode Indicator */}
-          <View style={styles.marginModeRow}>
-            <View style={styles.marginModeBadge}>
-              <ShieldIcon size={12} color={colors.accent} />
-              <Text style={styles.marginModeText}>
-                {stats.marginMode === 'cross' ? 'Cross Margin' : 'Portfolio Margin'}
-              </Text>
-            </View>
+          <View style={styles.marginModeBadge}>
+            <ShieldIcon size={12} color={colors.accent} />
+            <Text style={styles.marginModeText}>Cross Margin</Text>
           </View>
         </View>
 
         {/* Equity Card */}
         <View style={styles.equityCard}>
-          <View style={styles.equityBox}>
-            <Text style={styles.equityLabel}>ACCOUNT EQUITY</Text>
-            <Text style={styles.equityValue}>${fmt(stats.equity)}</Text>
-            <Text style={[styles.pnlToday, { color: pnlColor(stats.realizedPnlToday) }]}>
-              {pnlSign(stats.realizedPnlToday)}${fmt(stats.realizedPnlToday)} today
-            </Text>
-          </View>
-
-          {/* Equity Breakdown */}
-          <View style={styles.breakdownRow}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Account Value</Text>
-              <Text style={styles.breakdownValue}>${fmt(stats.accountValue)}</Text>
+          <Text style={styles.equityLabel}>ACCOUNT EQUITY</Text>
+          <Text style={styles.equityValue}>${fmt(balance.equity)}</Text>
+          <Text style={[styles.pnlToday, { color: pnlColor(totalPnl) }]}>
+            {pnlSign(totalPnl)}${fmt(Math.abs(totalPnl))} unrealized
+          </Text>
+          <View style={styles.equityBreakdown}>
+            <View style={styles.eqItem}>
+              <Text style={styles.eqItemLabel}>Balance</Text>
+              <Text style={styles.eqItemValue}>${fmt(balance.total)}</Text>
             </View>
-            <View style={styles.breakdownDivider} />
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Unrealized PnL</Text>
-              <Text style={[styles.breakdownValue, { color: pnlColor(stats.unrealizedPnl) }]}>
-                {pnlSign(stats.unrealizedPnl)}${fmt(stats.unrealizedPnl)}
+            <View style={styles.eqDivider} />
+            <View style={styles.eqItem}>
+              <Text style={styles.eqItemLabel}>Unrealized</Text>
+              <Text style={[styles.eqItemValue, { color: pnlColor(balance.unrealizedPnl) }]}>
+                {pnlSign(balance.unrealizedPnl)}${fmt(Math.abs(balance.unrealizedPnl))}
               </Text>
             </View>
-            <View style={styles.breakdownDivider} />
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Maint. Margin</Text>
-              <Text style={styles.breakdownValue}>${fmt(stats.maintenanceMargin)}</Text>
+            <View style={styles.eqDivider} />
+            <View style={styles.eqItem}>
+              <Text style={styles.eqItemLabel}>Available</Text>
+              <Text style={[styles.eqItemValue, { color: colors.profit }]}>${fmt(balance.available)}</Text>
             </View>
           </View>
         </View>
 
-        {/* Key Stats Grid */}
+        {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Margin Used</Text>
-              <Text style={styles.statValue}>${fmt(stats.marginUsed)}</Text>
+              <Text style={styles.statValue}>${fmt(balance.marginUsed)}</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Available</Text>
-              <Text style={[styles.statValue, { color: colors.profit }]}>${fmt(stats.availableMargin)}</Text>
+              <Text style={styles.statLabel}>Win Rate</Text>
+              <Text style={[styles.statValue, { color: stats.winRate >= 50 ? colors.profit : colors.loss }]}>
+                {stats.winRate.toFixed(1)}%
+              </Text>
             </View>
           </View>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Unrealized PnL</Text>
-              <Text style={[styles.statValue, { color: pnlColor(stats.unrealizedPnl) }]}>
-                {pnlSign(stats.unrealizedPnl)}${fmt(stats.unrealizedPnl)}
+              <Text style={styles.statLabel}>Total PnL</Text>
+              <Text style={[styles.statValue, { color: pnlColor(stats.totalPnl) }]}>
+                {pnlSign(stats.totalPnl)}${fmt(Math.abs(stats.totalPnl))}
               </Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Avg Leverage</Text>
-              <Text style={styles.statValue}>{stats.avgLeverage}x</Text>
+              <Text style={styles.statLabel}>Total Trades</Text>
+              <Text style={styles.statValue}>{stats.totalTrades}</Text>
             </View>
           </View>
         </View>
@@ -121,22 +137,11 @@ export default function PortfolioScreen() {
               <Text style={styles.marginBarLabel}>Margin Ratio</Text>
             </View>
             <Text style={[styles.marginBarPct, { color: marginRatioColor }]}>
-              {stats.marginRatio.toFixed(1)}%
+              {marginRatio.toFixed(1)}%
             </Text>
           </View>
           <View style={styles.marginBarTrack}>
-            <View
-              style={[
-                styles.marginBarFill,
-                {
-                  width: `${Math.min(stats.marginRatio, 100)}%`,
-                  backgroundColor: marginRatioColor,
-                },
-              ]}
-            />
-            {/* Danger zone markers */}
-            <View style={[styles.marginMarker, { left: '50%' }]} />
-            <View style={[styles.marginMarker, { left: '80%' }]} />
+            <View style={[styles.marginBarFill, { width: `${Math.min(marginRatio, 100)}%`, backgroundColor: marginRatioColor }]} />
           </View>
           <View style={styles.marginBarFooter}>
             <Text style={styles.marginBarFooterText}>Safe</Text>
@@ -145,90 +150,138 @@ export default function PortfolioScreen() {
           </View>
         </View>
 
-        {/* 7-Day PnL Chart */}
-        <View style={styles.pnlChartCard}>
-          <View style={styles.pnlChartHeader}>
-            <ChartIcon size={14} color={colors.accent} />
-            <Text style={styles.pnlChartTitle}>7-DAY PNL</Text>
-          </View>
-          <View style={styles.pnlBars}>
-            {pnlData.map((d) => {
-              const barH = (Math.abs(d.pnl) / maxPnl) * 60;
-              const isProfit = d.pnl >= 0;
-              return (
-                <View key={d.day} style={styles.pnlBarCol}>
-                  <View style={styles.pnlBarArea}>
-                    {isProfit ? (
-                      <>
-                        <View style={{ flex: 1 }} />
-                        <View style={[styles.pnlBar, { height: barH, backgroundColor: colors.profit }]} />
-                        <View style={styles.pnlBarCenter} />
-                        <View style={{ height: 30 }} />
-                      </>
-                    ) : (
-                      <>
-                        <View style={{ flex: 1 }} />
-                        <View style={{ height: 30 }} />
-                        <View style={styles.pnlBarCenter} />
-                        <View style={[styles.pnlBar, { height: barH, backgroundColor: colors.loss }]} />
-                      </>
-                    )}
-                  </View>
-                  <Text style={styles.pnlBarLabel}>{d.day}</Text>
-                  <Text style={[styles.pnlBarValue, { color: pnlColor(d.pnl) }]}>
-                    {pnlSign(d.pnl)}${Math.abs(d.pnl)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+        {/* Tab Toggle: Positions / History */}
+        <View style={styles.tabToggle}>
+          <Pressable
+            onPress={() => setActiveTab('positions')}
+            style={[styles.tab, activeTab === 'positions' && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, activeTab === 'positions' && styles.tabTextActive]}>
+              Positions ({positions.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveTab('history')}
+            style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+              History ({trades.length})
+            </Text>
+          </Pressable>
         </View>
 
         {/* Positions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Open Positions</Text>
-            <View style={styles.posCountBadge}>
-              <Text style={styles.posCountText}>{positions.length}</Text>
-            </View>
-            <View style={{ flex: 1 }} />
-            <Text style={[styles.totalPnl, { color: pnlColor(totalPnl) }]}>
-              {pnlSign(totalPnl)}${fmt(Math.abs(totalPnl))}
-            </Text>
+        {activeTab === 'positions' && (
+          <View style={styles.section}>
+            {positions.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>No Open Positions</Text>
+                <Text style={styles.emptySubtitle}>Open a trade from the Trade tab to get started</Text>
+              </View>
+            ) : (
+              positions.map((pos) => {
+                const isLong = pos.side === 'long';
+                const pnl = pos.unrealizedPnl;
+                return (
+                  <View key={pos.id} style={styles.posCard}>
+                    <View style={styles.posHeader}>
+                      <View style={styles.posHeaderLeft}>
+                        <Text style={styles.posMarket}>{pos.symbol}</Text>
+                        <View style={[styles.sideBadge, { backgroundColor: isLong ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)' }]}>
+                          <Text style={[styles.sideText, { color: isLong ? colors.profit : colors.loss }]}>
+                            {pos.side.toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={styles.leverageTag}>{pos.leverage}x</Text>
+                      </View>
+                      <Pressable onPress={() => handleClosePosition(pos.id)} style={styles.closeBtn}>
+                        <Text style={styles.closeBtnText}>Close</Text>
+                      </Pressable>
+                    </View>
+                    <View style={styles.posBody}>
+                      <View style={styles.posStat}>
+                        <Text style={styles.posStatLabel}>Size</Text>
+                        <Text style={styles.posStatValue}>${fmt(pos.sizeUsd, 0)}</Text>
+                      </View>
+                      <View style={styles.posStat}>
+                        <Text style={styles.posStatLabel}>Entry</Text>
+                        <Text style={styles.posStatValue}>${fmt(pos.entryPrice, 2)}</Text>
+                      </View>
+                      <View style={styles.posStat}>
+                        <Text style={styles.posStatLabel}>Mark</Text>
+                        <Text style={styles.posStatValue}>${fmt(pos.markPrice, 2)}</Text>
+                      </View>
+                      <View style={styles.posStat}>
+                        <Text style={styles.posStatLabel}>Liq</Text>
+                        <Text style={[styles.posStatValue, { color: colors.caution }]}>
+                          ${fmt(pos.liquidationPrice, 2)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.posFooter}>
+                      <Text style={styles.posMargin}>Margin: ${fmt(pos.margin)}</Text>
+                      <View style={styles.pnlBox}>
+                        <Text style={[styles.pnlValue, { color: pnlColor(pnl) }]}>
+                          {pnlSign(pnl)}${fmt(Math.abs(pnl))}
+                        </Text>
+                        <Text style={[styles.pnlPct, { color: pnlColor(pnl) }]}>
+                          {pnlSign(pos.unrealizedPnlPct)}{pos.unrealizedPnlPct.toFixed(2)}%
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
+        )}
 
-          {positions.map((pos) => (
-            <PositionCard key={pos.id} position={pos} />
-          ))}
-        </View>
-
-        {/* Fee Tier */}
-        <Pressable onPress={() => setShowFees(!showFees)} style={styles.feeTierCard}>
-          <View style={styles.feeTierHeader}>
-            <Text style={styles.feeTierTitle}>Fee Tier</Text>
-            <View style={styles.feeTierBadge}>
-              <Text style={styles.feeTierBadgeText}>Bronze</Text>
-            </View>
-            <Text style={styles.feeTierChevron}>{showFees ? '▲' : '▼'}</Text>
+        {/* Trade History */}
+        {activeTab === 'history' && (
+          <View style={styles.section}>
+            {trades.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>No Trade History</Text>
+                <Text style={styles.emptySubtitle}>Closed trades will appear here</Text>
+              </View>
+            ) : (
+              trades.slice(0, 50).map((trade) => {
+                const isLong = trade.side === 'long';
+                return (
+                  <View key={trade.id} style={styles.tradeCard}>
+                    <View style={styles.tradeCardHeader}>
+                      <View style={styles.tradeCardLeft}>
+                        <Text style={styles.tradeSymbol}>{trade.symbol}</Text>
+                        <View style={[styles.sideBadge, { backgroundColor: isLong ? 'rgba(0,214,143,0.15)' : 'rgba(255,107,138,0.15)' }]}>
+                          <Text style={[styles.sideText, { color: isLong ? colors.profit : colors.loss }]}>
+                            {trade.side.toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={styles.leverageTag}>{trade.leverage}x</Text>
+                      </View>
+                      <View style={styles.tradeCardRight}>
+                        <Text style={[styles.tradePnl, { color: pnlColor(trade.pnl) }]}>
+                          {pnlSign(trade.pnl)}${fmt(Math.abs(trade.pnl))}
+                        </Text>
+                        <Text style={[styles.tradePnlPct, { color: pnlColor(trade.pnl) }]}>
+                          {pnlSign(trade.pnlPct)}{trade.pnlPct.toFixed(2)}%
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.tradeCardBody}>
+                      <Text style={styles.tradeDetail}>
+                        Entry: ${fmt(trade.entryPrice, 2)} → Exit: ${fmt(trade.exitPrice, 2)}
+                      </Text>
+                      <Text style={styles.tradeDetail}>
+                        Size: ${fmt(trade.sizeUsd, 0)} · {new Date(trade.closedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
-          {showFees && (
-            <View style={styles.feeTierTable}>
-              {feeTiers.map((tier) => (
-                <View
-                  key={tier.tier}
-                  style={[styles.feeTierRow, tier.current && styles.feeTierRowActive]}
-                >
-                  <Text style={[styles.feeCell, styles.feeTierName, tier.current && { color: colors.accent }]}>
-                    {tier.tier}
-                  </Text>
-                  <Text style={styles.feeCell}>{tier.volume}</Text>
-                  <Text style={[styles.feeCell, { color: colors.profit }]}>{tier.maker}</Text>
-                  <Text style={styles.feeCell}>{tier.taker}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </Pressable>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -237,22 +290,10 @@ export default function PortfolioScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.bgPrimary,
-  },
-  header: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  marginModeRow: {
-    marginTop: 8,
-  },
+  safe: { flex: 1, backgroundColor: colors.bgPrimary },
+  content: { padding: 16 },
+  header: { marginBottom: 16 },
+  title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800' },
   marginModeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -264,80 +305,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    marginTop: 8,
   },
-  marginModeText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  marginModeText: { color: colors.accent, fontSize: 11, fontWeight: '600' },
+  // Equity
   equityCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderAccent,
-    overflow: 'hidden',
-  },
-  equityBox: {
     padding: 20,
     alignItems: 'center',
+    marginBottom: 16,
   },
-  equityLabel: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  equityValue: {
-    color: colors.textPrimary,
-    fontSize: 34,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  pnlToday: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  breakdownRow: {
+  equityLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
+  equityValue: { color: colors.textPrimary, fontSize: 34, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  pnlToday: { fontSize: 14, fontWeight: '600', marginTop: 6 },
+  equityBreakdown: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingTop: 14,
+    marginTop: 14,
+    width: '100%',
   },
-  breakdownItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  breakdownDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-  },
-  breakdownLabel: {
-    color: colors.textMuted,
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    marginBottom: 4,
-  },
-  breakdownValue: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  statsGrid: {
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  eqItem: { flex: 1, alignItems: 'center' },
+  eqDivider: { width: 1, backgroundColor: colors.border },
+  eqItemLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '600', letterSpacing: 0.3, marginBottom: 4 },
+  eqItemValue: { color: colors.textPrimary, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  // Stats
+  statsGrid: { gap: 10, marginBottom: 16 },
+  statsRow: { flexDirection: 'row', gap: 10 },
   statCard: {
     flex: 1,
     backgroundColor: colors.bgCard,
@@ -346,221 +344,97 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 14,
   },
-  statLabel: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 6,
-  },
-  statValue: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  // Margin bar
-  marginBarContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  marginBarHeader: {
+  statLabel: { color: colors.textSecondary, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 },
+  statValue: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  // Margin Bar
+  marginBarContainer: { marginBottom: 20 },
+  marginBarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  marginBarHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  marginBarLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  marginBarPct: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  marginBarTrack: { height: 8, borderRadius: 4, backgroundColor: colors.bgCard, overflow: 'hidden' },
+  marginBarFill: { height: '100%', borderRadius: 4 },
+  marginBarFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  marginBarFooterText: { color: colors.textMuted, fontSize: 9 },
+  // Tab Toggle
+  tabToggle: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  marginBarHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  marginBarLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  marginBarPct: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  marginBarTrack: {
-    height: 8,
-    borderRadius: 4,
     backgroundColor: colors.bgCard,
-    overflow: 'hidden',
-    position: 'relative',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 16,
   },
-  marginBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  marginMarker: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: colors.textMuted,
-  },
-  marginBarFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  marginBarFooterText: {
-    color: colors.textMuted,
-    fontSize: 9,
-  },
-  // PnL Chart
-  pnlChartCard: {
-    marginHorizontal: 16,
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+  tabActive: { backgroundColor: colors.bgElevated },
+  tabText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  tabTextActive: { color: colors.textPrimary },
+  // Sections
+  section: {},
+  emptyState: {
     backgroundColor: colors.bgCard,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    marginBottom: 20,
-  },
-  pnlChartHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  pnlChartTitle: {
-    color: colors.textSecondary,
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  pnlBars: {
-    flexDirection: 'row',
-    gap: 8,
+    padding: 40,
     alignItems: 'center',
   },
-  pnlBarCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  pnlBarArea: {
-    height: 80,
-    width: '100%',
-    alignItems: 'center',
-  },
-  pnlBar: {
-    width: '70%',
-    borderRadius: 3,
-    minHeight: 4,
-  },
-  pnlBarCenter: {
-    width: '100%',
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  pnlBarLabel: {
-    color: colors.textMuted,
-    fontSize: 9,
-    marginTop: 4,
-  },
-  pnlBarValue: {
-    fontSize: 8,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-    marginTop: 2,
-  },
-  // Positions
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 8,
-  },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  posCountBadge: {
-    backgroundColor: colors.accentGlow,
-    borderWidth: 1,
-    borderColor: colors.borderAccent,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  posCountText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  totalPnl: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  // Fee tier
-  feeTierCard: {
-    marginHorizontal: 16,
+  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
+  // Position Card
+  posCard: {
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
+    marginBottom: 12,
   },
-  feeTierHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  feeTierTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  feeTierBadge: {
-    backgroundColor: colors.accentGlow,
+  posHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  posHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  posMarket: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  sideBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  sideText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  leverageTag: { color: colors.accent, fontSize: 11, fontWeight: '700' },
+  closeBtn: {
+    backgroundColor: 'rgba(255,107,138,0.12)',
     borderWidth: 1,
-    borderColor: colors.borderAccent,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    borderColor: 'rgba(255,107,138,0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 8,
   },
-  feeTierBadgeText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  feeTierChevron: {
-    color: colors.textSecondary,
-    fontSize: 10,
-    marginLeft: 'auto',
-  },
-  feeTierTable: {
-    marginTop: 14,
-    gap: 6,
-  },
-  feeTierRow: {
+  closeBtnText: { color: colors.loss, fontSize: 12, fontWeight: '600' },
+  posBody: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  posStat: { alignItems: 'center' },
+  posStatLabel: { color: colors.textSecondary, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  posStatValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  posFooter: {
     flexDirection: 'row',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  feeTierRowActive: {
-    backgroundColor: colors.accentGlow,
+  posMargin: { color: colors.textSecondary, fontSize: 12 },
+  pnlBox: { alignItems: 'flex-end' },
+  pnlValue: { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  pnlPct: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  // Trade History Card
+  tradeCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 8,
   },
-  feeCell: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontVariant: ['tabular-nums'],
-  },
-  feeTierName: {
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
+  tradeCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  tradeCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tradeSymbol: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  tradeCardRight: { alignItems: 'flex-end' },
+  tradePnl: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  tradePnlPct: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  tradeCardBody: { gap: 3 },
+  tradeDetail: { color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] },
 });
