@@ -12,10 +12,11 @@ interface OrderFormProps {
   currentPrice: number;
   maxLeverage: number;
   availableMargin?: number;
+  isSubmitting?: boolean;
   onSubmit?: (side: 'long' | 'short', sizeUsd: number, leverage: number, orderType: string, tp?: number, sl?: number) => void;
 }
 
-export function OrderForm({ market, currentPrice, maxLeverage, availableMargin = 100000, onSubmit }: OrderFormProps) {
+export function OrderForm({ market, currentPrice, maxLeverage, availableMargin = 100000, isSubmitting = false, onSubmit }: OrderFormProps) {
   const [orderType, setOrderType] = useState<OrderType>('market');
   const [sizeUsd, setSizeUsd] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
@@ -162,7 +163,7 @@ export function OrderForm({ market, currentPrice, maxLeverage, availableMargin =
         <View style={styles.tpslInputs}>
           <View style={styles.tpslInputGroup}>
             <Text style={[styles.tpslInputLabel, { color: colors.profit }]}>Take Profit</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, styles.tpWrapper]}>
               <TextInput
                 style={styles.input}
                 value={tpPrice}
@@ -172,11 +173,17 @@ export function OrderForm({ market, currentPrice, maxLeverage, availableMargin =
                 keyboardType="decimal-pad"
                 keyboardAppearance="dark"
               />
+              <Text style={styles.inputUnit}>USD</Text>
             </View>
+            {tpPrice && (
+              <Text style={styles.tpslHint}>
+                {((parseFloat(tpPrice) / currentPrice - 1) * 100).toFixed(2)}% from entry
+              </Text>
+            )}
           </View>
           <View style={styles.tpslInputGroup}>
             <Text style={[styles.tpslInputLabel, { color: colors.loss }]}>Stop Loss</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, styles.slWrapper]}>
               <TextInput
                 style={styles.input}
                 value={slPrice}
@@ -186,7 +193,13 @@ export function OrderForm({ market, currentPrice, maxLeverage, availableMargin =
                 keyboardType="decimal-pad"
                 keyboardAppearance="dark"
               />
+              <Text style={styles.inputUnit}>USD</Text>
             </View>
+            {slPrice && (
+              <Text style={styles.tpslHint}>
+                {((parseFloat(slPrice) / currentPrice - 1) * 100).toFixed(2)}% from entry
+              </Text>
+            )}
           </View>
         </View>
       )}
@@ -209,15 +222,29 @@ export function OrderForm({ market, currentPrice, maxLeverage, availableMargin =
       <View style={styles.actionButtons}>
         <Pressable
           onPress={() => handleOrder('long')}
-          style={({ pressed }) => [styles.longBtn, pressed && styles.btnPressed]}
+          style={({ pressed }) => [
+            styles.longBtn, 
+            pressed && styles.btnPressed,
+            isSubmitting && styles.btnDisabled
+          ]}
+          disabled={isSubmitting}
         >
-          <Text style={styles.longBtnText}>Long / Buy</Text>
+          <Text style={[styles.longBtnText, isSubmitting && styles.btnTextDisabled]}>
+            {isSubmitting ? 'Processing...' : 'Long / Buy'}
+          </Text>
         </Pressable>
         <Pressable
           onPress={() => handleOrder('short')}
-          style={({ pressed }) => [styles.shortBtn, pressed && styles.btnPressed]}
+          style={({ pressed }) => [
+            styles.shortBtn, 
+            pressed && styles.btnPressed,
+            isSubmitting && styles.btnDisabled
+          ]}
+          disabled={isSubmitting}
         >
-          <Text style={styles.shortBtnText}>Short / Sell</Text>
+          <Text style={[styles.shortBtnText, isSubmitting && styles.btnTextDisabled]}>
+            {isSubmitting ? 'Processing...' : 'Short / Sell'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -311,6 +338,9 @@ const styles = StyleSheet.create({
   tpslInputs: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   tpslInputGroup: { flex: 1 },
   tpslInputLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 6 },
+  tpWrapper: { borderColor: 'rgba(0,214,143,0.3)' },
+  slWrapper: { borderColor: 'rgba(255,107,138,0.3)' },
+  tpslHint: { color: colors.textMuted, fontSize: 9, marginTop: 4, textAlign: 'center' },
   feeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -335,6 +365,8 @@ const styles = StyleSheet.create({
   longBtn: { flex: 1, backgroundColor: colors.profit, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   shortBtn: { flex: 1, backgroundColor: colors.loss, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   btnPressed: { opacity: 0.85 },
+  btnDisabled: { opacity: 0.6 },
   longBtnText: { color: '#000', fontSize: 15, fontWeight: '700' },
   shortBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnTextDisabled: { opacity: 0.7 },
 });

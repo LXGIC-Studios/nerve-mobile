@@ -41,6 +41,7 @@ export default function TradeScreen() {
   const [showMarketPicker, setShowMarketPicker] = useState(false);
   const [showPositions, setShowPositions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const { prices, error: priceError, refresh } = usePrices();
   const { positions, balance, openPosition, closePosition, ready } = useTradingEngine();
   
@@ -83,25 +84,32 @@ export default function TradeScreen() {
   const handleConfirmOrder = useCallback(async () => {
     if (!confirmOrder) return;
     
+    setIsSubmittingOrder(true);
+    
     if (Platform.OS !== 'web') {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    const result = openPosition({
-      symbol: market.symbol,
-      side: confirmOrder.side,
-      sizeUsd: confirmOrder.sizeUsd,
-      leverage: confirmOrder.leverage,
-      price: confirmOrder.price,
-      tp: confirmOrder.tp,
-      sl: confirmOrder.sl,
-    });
+    try {
+      const result = openPosition({
+        symbol: market.symbol,
+        side: confirmOrder.side,
+        sizeUsd: confirmOrder.sizeUsd,
+        leverage: confirmOrder.leverage,
+        price: confirmOrder.price,
+        tp: confirmOrder.tp,
+        sl: confirmOrder.sl,
+      });
 
-    if (!result) {
-      Alert.alert('Insufficient Margin', 'Not enough available margin to open this position.');
+      if (!result) {
+        Alert.alert('Insufficient Margin', 'Not enough available margin to open this position.');
+      }
+    } catch (error) {
+      Alert.alert('Order Failed', 'Failed to place order. Please try again.');
+    } finally {
+      setIsSubmittingOrder(false);
+      setConfirmOrder(null);
     }
-
-    setConfirmOrder(null);
   }, [confirmOrder, market.symbol, openPosition]);
 
   const handleClosePosition = useCallback(async (posId: string) => {
@@ -233,6 +241,7 @@ export default function TradeScreen() {
           currentPrice={livePrice}
           maxLeverage={market.maxLeverage}
           availableMargin={balance.available}
+          isSubmitting={isSubmittingOrder}
           onSubmit={handleOrderSubmit}
         />
 

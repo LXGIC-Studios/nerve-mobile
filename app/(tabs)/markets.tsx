@@ -8,6 +8,7 @@ import {
   StyleSheet,
   SafeAreaView,
   RefreshControl,
+  Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -196,7 +197,10 @@ export default function MarketsScreen() {
           return (
             <MarketCard
               market={{ ...item, price: livePrice, change24h: liveChange }}
-              onPress={() => router.push(`/market/${item.symbol}`)}
+              onPress={() => {
+                Keyboard.dismiss();
+                router.push(`/market/${item.symbol}`);
+              }}
               isFavorite={favorites.has(item.symbol)}
               onToggleFavorite={() => toggleFavorite(item.symbol)}
             />

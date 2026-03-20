@@ -175,8 +175,13 @@ export default function PortfolioScreen() {
           <View style={styles.section}>
             {positions.length === 0 ? (
               <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <ChartIcon size={32} color={colors.textMuted} />
+                </View>
                 <Text style={styles.emptyTitle}>No Open Positions</Text>
-                <Text style={styles.emptySubtitle}>Open a trade from the Trade tab to get started</Text>
+                <Text style={styles.emptySubtitle}>
+                  Open a trade from the Trade tab to start building your portfolio
+                </Text>
               </View>
             ) : (
               positions.map((pos) => {
@@ -241,8 +246,13 @@ export default function PortfolioScreen() {
           <View style={styles.section}>
             {trades.length === 0 ? (
               <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <ChartIcon size={32} color={colors.textMuted} />
+                </View>
                 <Text style={styles.emptyTitle}>No Trade History</Text>
-                <Text style={styles.emptySubtitle}>Closed trades will appear here</Text>
+                <Text style={styles.emptySubtitle}>
+                  Closed trades will appear here with detailed performance metrics
+                </Text>
               </View>
             ) : (
               trades.slice(0, 50).map((trade) => {
@@ -378,8 +388,17 @@ const styles = StyleSheet.create({
     padding: 40,
     alignItems: 'center',
   },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
+  emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 18 },
   // Position Card
   posCard: {
     backgroundColor: colors.bgCard,

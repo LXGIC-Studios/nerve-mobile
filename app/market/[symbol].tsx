@@ -14,11 +14,15 @@ import { markets, generateOrderBook } from '../../src/data/mockData';
 import { fmt, pnlColor, pnlSign } from '../../src/hooks/useFormatters';
 import { usePrice } from '../../src/lib/hooks/usePrices';
 import { TradingViewChart } from '../../src/components/TradingViewChart';
-import { ChevronLeftIcon, LightningIcon } from '../../src/components/icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChevronLeftIcon, LightningIcon, StarIcon } from '../../src/components/icons';
+
+const FAVORITES_KEY = 'nerve_favorites';
 
 export default function MarketDetailScreen() {
   const { symbol } = useLocalSearchParams<{ symbol: string }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const market = markets.find((m) => m.symbol === symbol);
   
   if (!market) {
@@ -47,6 +51,32 @@ export default function MarketDetailScreen() {
     setRefreshing(false);
   }, [refresh]);
 
+  // Load favorite status
+  useEffect(() => {
+    AsyncStorage.getItem(FAVORITES_KEY).then((data) => {
+      if (data && symbol) {
+        const favorites = new Set(JSON.parse(data));
+        setIsFavorite(favorites.has(symbol));
+      }
+    });
+  }, [symbol]);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!symbol) return;
+    
+    const data = await AsyncStorage.getItem(FAVORITES_KEY);
+    const favorites = new Set(data ? JSON.parse(data) : []);
+    
+    if (favorites.has(symbol)) {
+      favorites.delete(symbol);
+    } else {
+      favorites.add(symbol);
+    }
+    
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]));
+    setIsFavorite(!isFavorite);
+  }, [symbol, isFavorite]);
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -63,13 +93,21 @@ export default function MarketDetailScreen() {
             <Text style={styles.headerLeverage}>Up to {market.maxLeverage}x Leverage</Text>
           </View>
         </View>
-        <Pressable 
-          style={styles.tradeBtn}
-          onPress={() => router.push('/')}
-        >
-          <LightningIcon size={14} color={colors.accent} />
-          <Text style={styles.tradeBtnText}>Trade</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable 
+            style={[styles.favoriteBtn, isFavorite && styles.favoriteBtnActive]}
+            onPress={toggleFavorite}
+          >
+            <StarIcon size={16} color={isFavorite ? colors.caution : colors.textSecondary} />
+          </Pressable>
+          <Pressable 
+            style={styles.tradeBtn}
+            onPress={() => router.push('/')}
+          >
+            <LightningIcon size={14} color={colors.accent} />
+            <Text style={styles.tradeBtnText}>Trade</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView 
@@ -204,6 +242,21 @@ const styles = StyleSheet.create({
   headerIconText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   headerSymbol: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
   headerLeverage: { color: colors.textSecondary, fontSize: 10, marginTop: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  favoriteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoriteBtnActive: {
+    backgroundColor: 'rgba(255,176,32,0.15)',
+    borderColor: 'rgba(255,176,32,0.3)',
+  },
   tradeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
